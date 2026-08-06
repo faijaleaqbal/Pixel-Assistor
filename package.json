@@ -1,0 +1,32 @@
+{
+  "name": "pixel-exchange-mm-assistant",
+  "version": "1.0.0",
+  "description": "Production-ready Discord.js v14 bot — crypto, moderation, UPI, games, utilities.",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:restart": "pm2 restart pixel-bot",
+    "pm2:stop": "pm2 stop pixel-bot",
+    "pm2:logs": "pm2 logs pixel-bot"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "discord-html-transcripts": "^3.2.0",
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.5",
+    "mongoose": "^8.6.0",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "eslint": "^9.10.0"
+  },
+  "allowScripts": {
+    "better-sqlite3@11.10.0": true
+  }
+}
