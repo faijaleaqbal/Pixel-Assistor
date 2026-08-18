@@ -19,7 +19,10 @@ module.exports = {
     const member = await message.guild.members.fetch(target.id).catch(() => null);
     if (!member) return message.reply({ content: 'Member not found in this guild.', allowedMentions: { parse: [] } });
 
-    const roles = member.roles.cache.filter((r) => r.id !== message.guild.id).map((r) => `<@&${r.id}>`).slice(0, 15).join(', ') || '—';
+    const roles = member.roles?.cache
+      ? member.roles.cache.filter((r) => r.id !== message.guild.id).map((r) => `<@&${r.id}>`).slice(0, 15).join(', ') || '—'
+      : '—';
+    const roleCount = member.roles?.cache?.size ? Math.max(0, member.roles.cache.size - 1) : 0;
     let warns = 0;
     let reaction = 0;
     try {
@@ -27,20 +30,23 @@ module.exports = {
       reaction = (await getDb().reactionStat.get(target.id, message.guild.id)).wins || 0;
     } catch { /* db not ready */ }
 
+    const avatarUrl = target.displayAvatarURL ? target.displayAvatarURL({ size: 512 }) : null;
+
     const e = new EmbedBuilder()
       .setColor(member.displayHexColor || config.embedColor)
-      .setTitle(`👤 ${target.tag}`)
-      .setThumbnail(target.displayAvatarURL({ size: 512 }))
+      .setTitle(`👤 ${target.tag || target.username}`)
+      .setThumbnail(avatarUrl)
       .addFields(
-        { name: 'ID', value: target.id, inline: true },
+        { name: 'ID', value: `\`${target.id}\``, inline: true },
         { name: 'Bot', value: target.bot ? 'Yes' : 'No', inline: true },
-        { name: 'Joined', value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>`, inline: true },
-        { name: 'Account Created', value: `<t:${Math.floor(target.createdTimestamp / 1000)}:R>`, inline: true },
+        { name: 'Joined', value: member.joinedTimestamp ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>` : 'Unknown', inline: true },
+        { name: 'Account Created', value: target.createdTimestamp ? `<t:${Math.floor(target.createdTimestamp / 1000)}:R>` : 'Unknown', inline: true },
         { name: 'Warns', value: String(warns), inline: true },
         { name: 'Reaction Wins', value: String(reaction), inline: true },
-        { name: `Roles [${member.roles.cache.size - 1}]`, value: roles, inline: false },
+        { name: `Roles [${roleCount}]`, value: roles, inline: false },
       )
       .setTimestamp();
     return message.reply({ embeds: [e], allowedMentions: { parse: [] } });
   },
 };
+
