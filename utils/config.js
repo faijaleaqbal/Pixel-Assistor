@@ -35,6 +35,7 @@ module.exports = {
   },
 
   // Crypto APIs (all optional)
+  alchemyApiKey: process.env.ALCHEMY_API_KEY || '',
   coingeckoApiKey: process.env.COINGECKO_API_KEY || '',
   coingeckoDemoApiKey: process.env.COINGECKO_DEMO_API_KEY || '',
   polygonscanApiKey: process.env.POLYGONSCAN_API_KEY || '',

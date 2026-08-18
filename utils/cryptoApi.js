@@ -473,10 +473,23 @@ const EVM_CHAINS = {
   },
 };
 
+function getChainRpcList(chainKey) {
+  const chain = EVM_CHAINS[chainKey];
+  if (!chain) return [];
+  const list = [...(chain.rpcEndpoints || [])];
+  if (config.alchemyApiKey) {
+    if (chainKey === 'ethereum') list.unshift(`https://eth-mainnet.g.alchemy.com/v2/${config.alchemyApiKey}`);
+    if (chainKey === 'polygon') list.unshift(`https://polygon-mainnet.g.alchemy.com/v2/${config.alchemyApiKey}`);
+    if (chainKey === 'bnb') list.unshift(`https://bnb-mainnet.g.alchemy.com/v2/${config.alchemyApiKey}`);
+  }
+  return list;
+}
+
 /**
  * Execute a JSON-RPC call against an EVM chain.
  */
-async function callEvmRpc(rpcList, method, params = []) {
+async function callEvmRpc(chainKeyOrList, method, params = []) {
+  const rpcList = typeof chainKeyOrList === 'string' ? getChainRpcList(chainKeyOrList) : chainKeyOrList;
   for (const endpoint of rpcList) {
     try {
       const payload = { jsonrpc: '2.0', id: 1, method, params };
@@ -529,11 +542,12 @@ async function evmFetchTx(chainKey, hash) {
     }
   }
 
-  // 2) Public RPC fallback if explorer key was missing or returned null
-  if (!tx && chain.rpcEndpoints && chain.rpcEndpoints.length) {
-    tx = await callEvmRpc(chain.rpcEndpoints, 'eth_getTransactionByHash', [hash]);
+  // 2) RPC / Alchemy fallback if explorer key was missing or returned null
+  const rpcList = getChainRpcList(chainKey);
+  if (!tx && rpcList.length) {
+    tx = await callEvmRpc(chainKey, 'eth_getTransactionByHash', [hash]);
     if (tx) {
-      receipt = await callEvmRpc(chain.rpcEndpoints, 'eth_getTransactionReceipt', [hash]);
+      receipt = await callEvmRpc(chainKey, 'eth_getTransactionReceipt', [hash]);
     }
   }
 
@@ -596,16 +610,17 @@ async function evmFetchBalance(chainKey, address) {
     }
   }
 
-  // 2) RPC Fallback (works with zero API keys!)
-  if (nativeBalance === null && chain.rpcEndpoints && chain.rpcEndpoints.length) {
-    const rawNative = await callEvmRpc(chain.rpcEndpoints, 'eth_getBalance', [address, 'latest']);
+  // 2) RPC / Alchemy Fallback
+  const rpcList = getChainRpcList(chainKey);
+  if (nativeBalance === null && rpcList.length) {
+    const rawNative = await callEvmRpc(chainKey, 'eth_getBalance', [address, 'latest']);
     if (rawNative !== null) {
       nativeBalance = Number(BigInt(rawNative)) / 1e18;
     }
 
     if (chain.usdtContract) {
       const cleanAddr = address.toLowerCase().replace('0x', '').padStart(64, '0');
-      const rawUsdt = await callEvmRpc(chain.rpcEndpoints, 'eth_call', [{ to: chain.usdtContract, data: '0x70a08231' + cleanAddr }, 'latest']);
+      const rawUsdt = await callEvmRpc(chainKey, 'eth_call', [{ to: chain.usdtContract, data: '0x70a08231' + cleanAddr }, 'latest']);
       if (rawUsdt && rawUsdt !== '0x') {
         usdtBalance = Number(BigInt(rawUsdt)) / Math.pow(10, chain.usdtDecimals);
       }
