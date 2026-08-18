@@ -5,6 +5,7 @@ const { resolveMemberArg } = require('../../utils/resolveUser');
 
 module.exports = {
   name: 'nick',
+  aliases: ['nickname', 'setnick'],
   category: 'moderation',
   description: "Change a member's nickname. Accepts @user or raw userID.",
   usage: '<@user|userID> <new nickname|reset>',
@@ -14,13 +15,30 @@ module.exports = {
   async execute(message, args) {
     const target = await resolveMemberArg(message, args[0]);
     if (!target) return;
+
+    if (target.id === message.guild.ownerId && message.author.id !== message.guild.ownerId) {
+      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('❌ You cannot change the server owner\'s nickname.')] });
+    }
+    if (message.author.id !== message.guild.ownerId && target.id !== message.author.id && message.member.roles.highest.position <= target.roles.highest.position) {
+      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('❌ You cannot change the nickname of a member with an equal or higher role than you.')] });
+    }
+    if (!target.manageable && target.id !== message.client.user.id) {
+      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('❌ I cannot change that member\'s nickname — their role is higher than mine.')] });
+    }
+
     const newNick = args.slice(1).filter(a => !/^<@!?\d+>$/.test(a)).join(' ');
     if (!newNick) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Provide a new nickname or `reset`.')] });
+
+    if (newNick !== 'reset' && newNick.length > 32) {
+      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('❌ Nicknames must be 32 characters or fewer.')] });
+    }
+
     try {
       await target.setNickname(newNick === 'reset' ? null : newNick);
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Nickname updated for ${target.user.tag}.`)] });
+      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Nickname ${newNick === 'reset' ? 'reset' : `set to **${newNick}**`} for **${target.user.tag}**.`)] });
     } catch (e) {
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`Failed: ${e.message}`)] });
+      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`Failed to set nickname: ${e.message}`)] });
     }
   },
 };
+

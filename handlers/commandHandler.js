@@ -49,7 +49,7 @@ function load(client) {
         cmd.name = cmdName;
         commands.set(cmdName, cmd);
 
-        // Register metadata for the help command.
+        // Register metadata for the help command and slash syncing.
         meta.register(cmd.name, {
           category: cmd.category,
           description: cmd.description || 'No description provided.',
@@ -59,6 +59,8 @@ function load(client) {
           permissions: cmd.permissions || [],
           ownerOnly: !!cmd.ownerOnly,
           args: cmd.args || false,
+          slash: !!cmd.slash,
+          slashOptions: cmd.slashOptions || [],
         });
 
         if (cmd.aliases && cmd.aliases.length) {

@@ -107,7 +107,8 @@ function makeSqlite() {
       modRoles TEXT DEFAULT '[]',
       ownerRoles TEXT DEFAULT '[]',
       autoRoleBot TEXT,
-      autoRoleHuman TEXT
+      autoRoleHuman TEXT,
+      prefix TEXT
     );
     CREATE TABLE IF NOT EXISTS warn (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -206,6 +207,7 @@ function makeSqlite() {
   try { db.exec('ALTER TABLE guild_config ADD COLUMN modLimit INTEGER'); } catch {}
   try { db.exec('ALTER TABLE guild_config ADD COLUMN adminModLimit INTEGER'); } catch {}
   try { db.exec('ALTER TABLE guild_config ADD COLUMN modModLimit INTEGER'); } catch {}
+  try { db.exec('ALTER TABLE guild_config ADD COLUMN prefix TEXT'); } catch {}
 
   // JSON helpers
   const j = (s, fallback = []) => { try { return JSON.parse(s); } catch { return fallback; } };
@@ -386,6 +388,7 @@ function makeSqlite() {
           modLimit: r.modLimit != null ? r.modLimit : null,
           adminModLimit: r.adminModLimit != null ? r.adminModLimit : null,
           modModLimit: r.modModLimit != null ? r.modModLimit : null,
+          prefix: r.prefix || null,
         };
       },
       set: (guildId, data) => {
@@ -401,19 +404,21 @@ function makeSqlite() {
           modLimit: ex.modLimit != null ? ex.modLimit : null,
           adminModLimit: ex.adminModLimit != null ? ex.adminModLimit : null,
           modModLimit: ex.modModLimit != null ? ex.modModLimit : null,
+          prefix: ex.prefix || null,
         } : { badWords: [], antiLink: false, antiSpam: false,
             adminRoles: [], modRoles: [], ownerRoles: [],
-            modLimit: null, adminModLimit: null, modModLimit: null };
+            modLimit: null, adminModLimit: null, modModLimit: null, prefix: null };
         const m = { ...base, ...data, guildId };
-        db.prepare(`INSERT INTO guild_config (guildId,logChannel,autoRoleId,welcomeChannel,welcomeMsg,leaveChannel,leaveMsg,badWords,antiLink,antiSpam,adminRoles,modRoles,ownerRoles,autoRoleBot,autoRoleHuman,modLimit,adminModLimit,modModLimit)
-          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(guildId) DO UPDATE SET
+        db.prepare(`INSERT INTO guild_config (guildId,logChannel,autoRoleId,welcomeChannel,welcomeMsg,leaveChannel,leaveMsg,badWords,antiLink,antiSpam,adminRoles,modRoles,ownerRoles,autoRoleBot,autoRoleHuman,modLimit,adminModLimit,modModLimit,prefix)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(guildId) DO UPDATE SET
           logChannel=excluded.logChannel, autoRoleId=excluded.autoRoleId,
           welcomeChannel=excluded.welcomeChannel, welcomeMsg=excluded.welcomeMsg,
           leaveChannel=excluded.leaveChannel, leaveMsg=excluded.leaveMsg,
           badWords=excluded.badWords, antiLink=excluded.antiLink, antiSpam=excluded.antiSpam,
           adminRoles=excluded.adminRoles, modRoles=excluded.modRoles, ownerRoles=excluded.ownerRoles,
           autoRoleBot=excluded.autoRoleBot, autoRoleHuman=excluded.autoRoleHuman,
-          modLimit=excluded.modLimit, adminModLimit=excluded.adminModLimit, modModLimit=excluded.modModLimit`)
+          modLimit=excluded.modLimit, adminModLimit=excluded.adminModLimit, modModLimit=excluded.modModLimit,
+          prefix=excluded.prefix`)
           .run(guildId,
             m.logChannel||null,
             m.autoRoleId||null,
@@ -431,7 +436,8 @@ function makeSqlite() {
             m.autoRoleHuman||null,
             m.modLimit == null ? null : Number(m.modLimit),
             m.adminModLimit == null ? null : Number(m.adminModLimit),
-            m.modModLimit == null ? null : Number(m.modModLimit)
+            m.modModLimit == null ? null : Number(m.modModLimit),
+            m.prefix||null
           );
         return m;
       },
@@ -642,6 +648,7 @@ function makeMongo() {
     modLimit: { type: Number, default: null },
     adminModLimit: { type: Number, default: null },
     modModLimit: { type: Number, default: null },
+    prefix: { type: String, default: null },
   }));
 
   const Warn = mongoose.model('Warn', new Schema({

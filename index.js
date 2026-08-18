@@ -2,10 +2,9 @@
 // Entry point. Boots the Discord client, loads commands + events, starts the
 // reminder poller, and wires a global error catch.
 
-const { Client, GatewayIntentBits, Partials, Options, ActivityType } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, Options } = require('discord.js');
 const config = require('./utils/config');
 const logger = require('./utils/logger');
-const { init: dbInit } = require('./utils/db');
 const commandHandler = require('./handlers/commandHandler');
 const eventHandler = require('./handlers/eventHandler');
 
@@ -29,21 +28,10 @@ const client = new Client({
   sweepers: Options.DefaultSweepers,
 });
 
-// Load commands + events BEFORE login so 'ready' listeners registered by the
-// event handler actually fire when the gateway sends READY. Previously these
-// were loaded inside the ready handler, which made events/ready.js dead code
-// and risked dropping early events.
+// Load commands + events BEFORE login so event listeners
+// actually fire when the gateway connects.
 commandHandler.load(client);
 eventHandler.load(client);
-
-client.once('ready', async () => {
-  logger.success(`Logged in as ${client.user.tag}`);
-  try { await dbInit(); } catch (e) { logger.error('DB init failed', e.message); }
-  // Persist reminder poller
-  require('./utils/reminderPoller').start(client);
-  // Bot presence
-  client.user.setActivity(`?help • ${client.guilds.cache.size} guilds`, { type: ActivityType.Watching });
-});
 
 // Global error guards so the process never dies on a single rejection.
 process.on('unhandledRejection', (r) => logger.error('unhandledRejection', r?.message || r));

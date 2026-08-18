@@ -17,6 +17,16 @@
 //   if (!member) return; // error already replied
 
 const ID_RE = /^\d{17,19}$/;
+const MENTION_RE = /^<@!?(\d{17,19})>$/;
+
+function extractUserId(arg) {
+  if (!arg) return null;
+  const str = String(arg).trim();
+  const match = str.match(MENTION_RE);
+  if (match) return match[1];
+  if (ID_RE.test(str)) return str;
+  return null;
+}
 
 /**
  * Resolve a user from a mention OR a raw ID string.
@@ -29,21 +39,26 @@ const ID_RE = /^\d{17,19}$/;
  */
 async function resolveUserArg(message, arg, opts = {}) {
   const silent = opts.silent === true;
+  const targetId = extractUserId(arg);
 
-  // 1) Mention used?
-  const mentioned = message.mentions?.users?.first();
-  if (mentioned) return mentioned;
+  if (targetId) {
+    // Check mentions collection first for speed
+    const fromMention = message.mentions?.users?.get(targetId);
+    if (fromMention) return fromMention;
 
-  // 2) Raw user ID?
-  if (arg && ID_RE.test(String(arg).trim())) {
     try {
-      return await message.client.users.fetch(String(arg).trim());
+      return await message.client.users.fetch(targetId);
     } catch {
       if (!silent) {
-        await safeReply(message, `❌ Could not find a user with ID \`${arg}\`. The ID may be invalid or the user may not share a server with me.`);
+        await safeReply(message, `❌ Could not find a user with ID \`${targetId}\`. The ID may be invalid or the user does not exist.`);
       }
       return null;
     }
+  }
+
+  // Fallback: if arg wasn't an explicit mention or raw ID, check if there's any mention
+  if (!arg && message.mentions?.users?.size) {
+    return message.mentions.users.first();
   }
 
   if (!silent) {
@@ -67,32 +82,32 @@ async function resolveUserArg(message, arg, opts = {}) {
  */
 async function resolveMemberArg(message, arg, opts = {}) {
   const silent = opts.silent === true;
+  const targetId = extractUserId(arg);
 
-  // 1) Mention used?
-  const mentionedMember = message.mentions?.members?.first();
-  if (mentionedMember) return mentionedMember;
+  if (targetId) {
+    const fromMemberMention = message.mentions?.members?.get(targetId);
+    if (fromMemberMention) return fromMemberMention;
 
-  // 2) Raw user ID?
-  if (arg && ID_RE.test(String(arg).trim())) {
-    const id = String(arg).trim();
     try {
-      // First make sure the user exists at all.
-      const user = await message.client.users.fetch(id);
-      // Then try to fetch the member from the current guild.
-      try {
-        return await message.guild.members.fetch(user.id);
-      } catch {
-        if (!silent) {
-          await safeReply(message, `❌ <@${id}> (\`${user.tag}\`) is not a member of this server.`);
-        }
-        return null;
-      }
+      return await message.guild.members.fetch(targetId);
     } catch {
+      // User might exist on Discord but not in this guild
+      let userTag = targetId;
+      try {
+        const u = await message.client.users.fetch(targetId);
+        userTag = u.tag;
+      } catch {}
+
       if (!silent) {
-        await safeReply(message, `❌ Could not find a user with ID \`${id}\`.`);
+        await safeReply(message, `❌ <@${targetId}> (\`${userTag}\`) is not a member of this server.`);
       }
       return null;
     }
+  }
+
+  // Fallback: if arg wasn't an explicit mention or raw ID, check if there's any member mention
+  if (!arg && message.mentions?.members?.size) {
+    return message.mentions.members.first();
   }
 
   if (!silent) {
@@ -113,4 +128,4 @@ async function safeReply(message, text) {
   }
 }
 
-module.exports = { resolveUserArg, resolveMemberArg, ID_RE };
+module.exports = { resolveUserArg, resolveMemberArg, extractUserId, ID_RE };

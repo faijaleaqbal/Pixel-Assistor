@@ -35,7 +35,7 @@ async function fetchAuditEntry(guild, type, targetId) {
   try {
     const resolved = typeof type === 'string' ? ACTION_MAP[type] : type;
     if (resolved == null) return null;
-    const logs = await guild.fetchAuditLogs({ limit: 100, type: resolved }).catch(() => null);
+    const logs = await guild.fetchAuditLogs({ limit: 10, type: resolved }).catch(() => null);
     if (!logs || !logs.entries.size) return null;
     // Find the first entry whose target matches and which is recent.
     for (const entry of logs.entries.values()) {

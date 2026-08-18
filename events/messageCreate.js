@@ -10,10 +10,22 @@ const { EmbedBuilder } = require('discord.js');
 const cooldowns = require('../utils/cooldowns');
 const { hasPermission, isOwner } = require('../utils/perms');
 const { getDb } = require('../utils/db');
+const { getPrefix } = require('../utils/prefixCache');
 
 // In-memory stores for XP cooldown and spam tracking
 const xpCooldowns = new Set();
 const spamMap = new Map();
+
+// Periodic cleanup every 5 minutes to prevent memory leaks from inactive users
+const spamMapInterval = setInterval(() => {
+  const cutoff = Date.now() - 5000;
+  for (const [key, timestamps] of spamMap.entries()) {
+    if (!timestamps.length || timestamps[timestamps.length - 1] < cutoff) {
+      spamMap.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
+if (typeof spamMapInterval.unref === 'function') spamMapInterval.unref();
 
 module.exports = {
   name: 'messageCreate',
@@ -154,21 +166,37 @@ module.exports = {
       }
     } catch { /* auto-mod error — never crash the handler */ }
 
-    // ── Command whitelist: let whitelisted users use commands without prefix ──
-    let isWlUser = false;
-    const hasPrefix = message.content.startsWith(config.prefix);
+    // ── Command Prefix Resolution & Whitelist ──
+    const guildPrefix = await getPrefix(message.guild.id);
+    const botMention1 = `<@${client.user.id}>`;
+    const botMention2 = `<@!${client.user.id}>`;
 
-    if (!hasPrefix) {
+    // Mention-only ping response
+    if (message.content.trim() === botMention1 || message.content.trim() === botMention2) {
+      return message.reply({ embeds: [new EmbedBuilder().setColor(config.embedColor).setDescription(`👋 Hey! My prefix in this server is \`${guildPrefix}\`.\nUse \`${guildPrefix}help\` to browse all available commands.`)] }).catch(() => {});
+    }
+
+    let prefixUsed = null;
+    if (message.content.startsWith(guildPrefix)) {
+      prefixUsed = guildPrefix;
+    } else if (message.content.startsWith(botMention1)) {
+      prefixUsed = botMention1;
+    } else if (message.content.startsWith(botMention2)) {
+      prefixUsed = botMention2;
+    }
+
+    let isWlUser = false;
+    if (!prefixUsed) {
       try {
         const db = getDb();
         isWlUser = await db.cmdWhitelist.isWhitelisted(message.author.id, message.guild.id);
       } catch { /* db not ready */ }
     }
 
-    if (!hasPrefix && !isWlUser) return;
+    if (!prefixUsed && !isWlUser) return;
 
-    const args = hasPrefix
-      ? message.content.slice(config.prefix.length).trim().split(/\s+/)
+    const args = prefixUsed
+      ? message.content.slice(prefixUsed.length).trim().split(/\s+/)
       : message.content.trim().split(/\s+/);
     const name = args.shift()?.toLowerCase();
     if (!name) return;
@@ -197,7 +225,7 @@ module.exports = {
 
     // Required args?
     if (cmd.args && !args.length) {
-      return replyError(message, `Missing arguments.\nUsage: \`${config.prefix}${cmd.name}${cmd.usage ? ' ' + cmd.usage : ''}\``);
+      return replyError(message, `Missing arguments.\nUsage: \`${guildPrefix}${cmd.name}${cmd.usage ? ' ' + cmd.usage : ''}\``);
     }
 
     try {

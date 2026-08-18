@@ -1,32 +1,56 @@
 // src/commands/utility/calc.js
 // Safe arithmetic calculator. Supports + - * / % ( ) and decimals.
 
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, ApplicationCommandOptionType } = require('discord.js');
 const config = require('../../utils/config');
 
 module.exports = {
   name: 'calc',
   aliases: ['c', 'calculate'],
   category: 'utility',
-  description: 'Evaluate a math expression. Usage: calc <expression>',
+  description: 'Evaluate a math expression safely.',
   usage: '<expression>',
   cooldown: 3,
   args: true,
+  slash: true,
+  slashOptions: [
+    {
+      name: 'expression',
+      description: 'The math expression to calculate (e.g. 25 * 4 + 10)',
+      type: ApplicationCommandOptionType.String,
+      required: true,
+    },
+  ],
   async execute(message, args) {
     const expr = args.join(' ');
-    if (!/^[\d+\-*/%().\s]+$/.test(expr)) {
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Only digits, `+ - * / % ( )` and spaces are allowed.')] });
-    }
-    try {
-      // eslint-disable-next-line no-new-func
-      const result = Function(`"use strict"; return (${expr});`)();
-      if (typeof result !== 'number' || !isFinite(result)) throw new Error('not a finite number');
-      return message.reply({ embeds: [new EmbedBuilder().setColor(config.embedColor).setTitle('🧮 Calculator').addFields(
-        { name: 'Input', value: `\`${expr}\``, inline: false },
-        { name: 'Result', value: `\`${result}\``, inline: false },
-      )] });
-    } catch (e) {
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`Invalid expression: ${e.message}`)] });
-    }
+    const embed = evaluateMath(expr);
+    return message.reply({ embeds: [embed] });
+  },
+  async slashExecute(interaction) {
+    const expr = interaction.options.getString('expression', true);
+    const embed = evaluateMath(expr);
+    return interaction.reply({ embeds: [embed] });
   },
 };
+
+function evaluateMath(expr) {
+  if (!/^[\d+\-*/%().\s]+$/.test(expr)) {
+    return new EmbedBuilder().setColor(0xED4245).setDescription('❌ Only digits, `+ - * / % ( )` and spaces are allowed.');
+  }
+  try {
+    // eslint-disable-next-line no-new-func
+    const result = Function(`"use strict"; return (${expr});`)();
+    if (typeof result !== 'number' || !isFinite(result)) throw new Error('Not a finite number');
+    return new EmbedBuilder()
+      .setColor(config.embedColor)
+      .setTitle('🧮 Calculator')
+      .addFields(
+        { name: 'Input', value: `\`${expr}\``, inline: true },
+        { name: 'Result', value: `\`${result}\``, inline: true },
+      )
+      .setTimestamp();
+  } catch (e) {
+    return new EmbedBuilder().setColor(0xED4245).setDescription(`❌ Invalid expression: ${e.message}`);
+  }
+}
+
