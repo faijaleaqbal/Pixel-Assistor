@@ -41,4 +41,24 @@ process.on('uncaughtException', (e) => {
   process.exit(1);
 });
 
+// Graceful shutdown on termination signals
+async function shutdown(signal) {
+  logger.info(`Received ${signal}. Shutting down cleanly...`);
+  try {
+    if (client) client.destroy();
+    const { getDb } = require('./utils/db');
+    const db = getDb();
+    if (db && typeof db.close === 'function') {
+      await db.close();
+    }
+  } catch {
+    /* ignore shutdown error */
+  } finally {
+    process.exit(0);
+  }
+}
+
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+
 client.login(config.token);
