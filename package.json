@@ -7,6 +7,8 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
+    "test": "node --test test/cryptoParser.test.js test/helpUI.test.js",
+    "test:live": "node test/fetchAndSmokeTest.js",
     "pm2:start": "pm2 start ecosystem.config.js",
     "pm2:restart": "pm2 restart pixel-bot",
     "pm2:stop": "pm2 stop pixel-bot",
