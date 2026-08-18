@@ -335,8 +335,8 @@ async function convert(amount, from, to) {
   // fiat → fiat
   if (fromFiat && toFiat) {
     const rates = await getFxRates();
-    const usdFrom = f === 'usd' ? 1 : rates[f];
-    const usdTo = t === 'usd' ? 1 : rates[t];
+    const usdFrom = f === 'usd' ? 1 : (rates[f.toUpperCase()] || rates[f]);
+    const usdTo = t === 'usd' ? 1 : (rates[t.toUpperCase()] || rates[t]);
     if (!usdFrom) throw new Error(`Fiat currency "${f.toUpperCase()}" is not supported by the FX rates API.`);
     if (!usdTo) throw new Error(`Fiat currency "${t.toUpperCase()}" is not supported by the FX rates API.`);
     // rates are USD-based: 1 USD = X f, so amount f → USD → t
@@ -357,7 +357,7 @@ async function convert(amount, from, to) {
   // fiat → crypto  OR  crypto → fiat
   if (fromFiat && !toFiat) {
     const rates = await getFxRates();
-    const usdFrom = f === 'usd' ? 1 : rates[f];
+    const usdFrom = f === 'usd' ? 1 : (rates[f.toUpperCase()] || rates[f]);
     if (!usdFrom) throw new Error(`Fiat currency "${f.toUpperCase()}" is not supported by the FX rates API.`);
     const usdAmount = amount / usdFrom;
     const tData = await getPrice(cgId(t));
@@ -370,7 +370,7 @@ async function convert(amount, from, to) {
   const usdAmount = amount * fData.usd;
   if (t === 'usd') return usdAmount;
   const rates = await getFxRates();
-  const usdTo = rates[t];
+  const usdTo = rates[t.toUpperCase()] || rates[t];
   if (!usdTo) throw new Error(`Fiat currency "${t.toUpperCase()}" is not supported by the FX rates API.`);
   return usdAmount * usdTo;
 }
@@ -442,6 +442,7 @@ const EVM_CHAINS = {
     explorerHost: 'https://api.polygonscan.com/api',
     explorerUrl: 'https://polygonscan.com',
     apiKey: () => config.polygonscanApiKey,
+    rpcEndpoints: ['https://polygon-bor-rpc.publicnode.com', 'https://polygon-rpc.com', 'https://rpc.ankr.com/polygon'],
     // USDT-ERC20 on Polygon: USDT contract + 6 decimals.
     usdtContract: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F',
     usdtDecimals: 6,
@@ -453,6 +454,7 @@ const EVM_CHAINS = {
     explorerHost: 'https://api.bscscan.com/api',
     explorerUrl: 'https://bscscan.com',
     apiKey: () => config.bscscanApiKey,
+    rpcEndpoints: ['https://bsc-rpc.publicnode.com', 'https://bsc-dataseed.binance.org', 'https://rpc.ankr.com/bsc'],
     // USDT-BEP20: BSC USDT contract, 18 decimals.
     usdtContract: '0x55d398326f99059fF775485246999027B3197955',
     usdtDecimals: 18,
@@ -464,6 +466,7 @@ const EVM_CHAINS = {
     explorerHost: 'https://api.etherscan.io/api',
     explorerUrl: 'https://etherscan.io',
     apiKey: () => config.etherscanApiKey,
+    rpcEndpoints: ['https://ethereum-rpc.publicnode.com', 'https://rpc.ankr.com/eth', 'https://1rpc.io/eth'],
     // USDT-ERC20 on Ethereum: Tether contract, 6 decimals.
     usdtContract: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
     usdtDecimals: 6,
@@ -471,52 +474,75 @@ const EVM_CHAINS = {
 };
 
 /**
- * Look up a transaction hash on a specific EVM chain via Etherscan-style API.
- * Returns a normalised object: { hash, from, to, value, symbol, decimals,
- * timestamp, confirmed, status, gasUsed, explorerTxUrl } or null if not found.
- *
- * Note: Etherscan/Polygonscan/BscScan do NOT support `module=transaction&action=gettxinfo`.
- * The closest equivalent is `module=account&action=txlist&address=...&page=1&offset=N`,
- * which returns the most recent transactions for an address — but we don't know the
- * sender from the hash alone. So we use the official `module=proxy&action=eth_getTransactionByHash`
- * endpoint, which returns the raw tx, then a second call to `eth_getTransactionReceipt`
- * for the status + gas used.
+ * Execute a JSON-RPC call against an EVM chain.
+ */
+async function callEvmRpc(rpcList, method, params = []) {
+  for (const endpoint of rpcList) {
+    try {
+      const payload = { jsonrpc: '2.0', id: 1, method, params };
+      const r = await fetchWithTimeout(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!r.ok) continue;
+      const j = await r.json().catch(() => null);
+      if (j && (j.result !== undefined || j.error === undefined)) {
+        return j.result;
+      }
+    } catch { /* try next endpoint */ }
+  }
+  return null;
+}
+
+/**
+ * Look up a transaction hash on a specific EVM chain via Explorer API or public RPC fallback.
  */
 async function evmFetchTx(chainKey, hash) {
   const chain = EVM_CHAINS[chainKey];
   if (!chain) throw new Error(`Unknown EVM chain: ${chainKey}`);
   const key = chain.apiKey();
-  if (!key) throw new Error(`${chain.label} API key not configured (set POLYGONSCAN_API_KEY${chainKey === 'bnb' ? ' / BSCSCAN_API_KEY' : chainKey === 'ethereum' ? ' / ETHERSCAN_API_KEY' : ''}).`);
 
-  // 1) Fetch the raw transaction (gives from/to/value).
-  const txUrl = `${chain.explorerHost}?module=proxy&action=eth_getTransactionByHash&txhash=${encodeURIComponent(hash)}${key ? `&apikey=${key}` : ''}`;
-  dbg('evmFetchTx chain=' + chainKey + ' URL:', redactUrl(txUrl));
-  const r = await fetchWithTimeout(txUrl);
-  if (!r.ok) {
-    const body = await r.text();
-    console.error(`[cryptoApi] evmFetchTx ${chain.label} returned ${r.status}: ${body.slice(0, 300)}`);
-    throw new Error(`${chain.label} API returned status ${r.status}.`);
+  let tx = null;
+  let receipt = null;
+
+  if (key) {
+    // 1) Explorer API lookup
+    const txUrl = `${chain.explorerHost}?module=proxy&action=eth_getTransactionByHash&txhash=${encodeURIComponent(hash)}&apikey=${key}`;
+    try {
+      const r = await fetchWithTimeout(txUrl);
+      if (r.ok) {
+        const j = await safeJson(r, `${chain.label} evmFetchTx`, txUrl);
+        if (j && j.result && j.result.hash) tx = j.result;
+      }
+    } catch { /* fallback to RPC */ }
+
+    if (tx) {
+      try {
+        const rcptUrl = `${chain.explorerHost}?module=proxy&action=eth_getTransactionReceipt&txhash=${encodeURIComponent(hash)}&apikey=${key}`;
+        const r2 = await fetchWithTimeout(rcptUrl);
+        if (r2.ok) {
+          const j2 = await safeJson(r2, `${chain.label} evmFetchTx receipt`, rcptUrl);
+          receipt = j2 && j2.result ? j2.result : null;
+        }
+      } catch { /* ignore */ }
+    }
   }
-  const j = await safeJson(r, `${chain.label} evmFetchTx`, txUrl);
-  if (!j || !j.result) return null;
-  const tx = j.result;
+
+  // 2) Public RPC fallback if explorer key was missing or returned null
+  if (!tx && chain.rpcEndpoints && chain.rpcEndpoints.length) {
+    tx = await callEvmRpc(chain.rpcEndpoints, 'eth_getTransactionByHash', [hash]);
+    if (tx) {
+      receipt = await callEvmRpc(chain.rpcEndpoints, 'eth_getTransactionReceipt', [hash]);
+    }
+  }
+
   if (!tx || !tx.hash) return null;
 
-  // 2) Fetch the receipt (gives status + gasUsed).
-  let receipt = null;
-  try {
-    const rcptUrl = `${chain.explorerHost}?module=proxy&action=eth_getTransactionReceipt&txhash=${encodeURIComponent(hash)}${key ? `&apikey=${key}` : ''}`;
-    const r2 = await fetchWithTimeout(rcptUrl);
-    if (r2.ok) {
-      const j2 = await safeJson(r2, `${chain.label} evmFetchTx receipt`, rcptUrl);
-      receipt = j2 && j2.result ? j2.result : null;
-    }
-  } catch { /* ignore */ }
-
-  // Value is in wei (hex). Convert to ether.
   const value = tx.value && tx.value !== '0x0' ? Number(BigInt(tx.value)) / 1e18 : 0;
-  const confirmed = receipt ? receipt.status === '0x1' : true; // assume success if no receipt
-  const ts = tx.blockNumber ? Date.now() : null; // Etherscan proxy doesn't return timestamp; we'd need the txlist endpoint for that.
+  const confirmed = receipt ? receipt.status === '0x1' : true;
+  const ts = Date.now();
+
   return {
     chain: chain.label,
     chainKey,
@@ -538,35 +564,55 @@ async function evmFetchTx(chainKey, hash) {
 
 /**
  * Fetch native + USDT balance for an address on a specific EVM chain.
- * Returns { chain, chainKey, address, nativeBalance, nativeSymbol, usdtBalance }.
  */
 async function evmFetchBalance(chainKey, address) {
   const chain = EVM_CHAINS[chainKey];
   if (!chain) throw new Error(`Unknown EVM chain: ${chainKey}`);
   const key = chain.apiKey();
-  if (!key) throw new Error(`${chain.label} API key not configured (set ${chainKey === 'polygon' ? 'POLYGONSCAN_API_KEY' : chainKey === 'bnb' ? 'BSCSCAN_API_KEY' : 'ETHERSCAN_API_KEY'}).`);
 
-  // Native balance (module=account&action=balance)
-  const balUrl = `${chain.explorerHost}?module=account&action=balance&address=${encodeURIComponent(address)}&tag=latest${key ? `&apikey=${key}` : ''}`;
-  dbg(`evmFetchBalance ${chainKey} native URL:`, redactUrl(balUrl));
-  const r1 = await fetchWithTimeout(balUrl);
-  const j1 = await safeJson(r1, `${chain.label} balance`, balUrl);
-  const nativeWei = j1 && j1.status === '1' ? BigInt(j1.result) : 0n;
-  const nativeBalance = Number(nativeWei) / 1e18;
-
-  // USDT (ERC20) balance via tokenholder action.
+  let nativeBalance = null;
   let usdtBalance = 0;
-  if (chain.usdtContract) {
-    const tUrl = `${chain.explorerHost}?module=account&action=tokenbalance&contractaddress=${chain.usdtContract}&address=${encodeURIComponent(address)}&tag=latest${key ? `&apikey=${key}` : ''}`;
-    dbg(`evmFetchBalance ${chainKey} USDT URL:`, redactUrl(tUrl));
+
+  // 1) Try Explorer API if key exists
+  if (key) {
     try {
-      const r2 = await fetchWithTimeout(tUrl);
-      const j2 = await safeJson(r2, `${chain.label} USDT balance`, tUrl);
-      if (j2 && j2.status === '1' && j2.result) {
-        usdtBalance = Number(BigInt(j2.result)) / Math.pow(10, chain.usdtDecimals);
+      const balUrl = `${chain.explorerHost}?module=account&action=balance&address=${encodeURIComponent(address)}&tag=latest&apikey=${key}`;
+      const r1 = await fetchWithTimeout(balUrl);
+      const j1 = await safeJson(r1, `${chain.label} balance`, balUrl);
+      if (j1 && j1.status === '1') {
+        nativeBalance = Number(BigInt(j1.result)) / 1e18;
       }
-    } catch { /* ignore token errors */ }
+    } catch { /* fallback to RPC */ }
+
+    if (chain.usdtContract && nativeBalance !== null) {
+      try {
+        const tUrl = `${chain.explorerHost}?module=account&action=tokenbalance&contractaddress=${chain.usdtContract}&address=${encodeURIComponent(address)}&tag=latest&apikey=${key}`;
+        const r2 = await fetchWithTimeout(tUrl);
+        const j2 = await safeJson(r2, `${chain.label} USDT balance`, tUrl);
+        if (j2 && j2.status === '1' && j2.result) {
+          usdtBalance = Number(BigInt(j2.result)) / Math.pow(10, chain.usdtDecimals);
+        }
+      } catch { /* ignore token errors */ }
+    }
   }
+
+  // 2) RPC Fallback (works with zero API keys!)
+  if (nativeBalance === null && chain.rpcEndpoints && chain.rpcEndpoints.length) {
+    const rawNative = await callEvmRpc(chain.rpcEndpoints, 'eth_getBalance', [address, 'latest']);
+    if (rawNative !== null) {
+      nativeBalance = Number(BigInt(rawNative)) / 1e18;
+    }
+
+    if (chain.usdtContract) {
+      const cleanAddr = address.toLowerCase().replace('0x', '').padStart(64, '0');
+      const rawUsdt = await callEvmRpc(chain.rpcEndpoints, 'eth_call', [{ to: chain.usdtContract, data: '0x70a08231' + cleanAddr }, 'latest']);
+      if (rawUsdt && rawUsdt !== '0x') {
+        usdtBalance = Number(BigInt(rawUsdt)) / Math.pow(10, chain.usdtDecimals);
+      }
+    }
+  }
+
+  if (nativeBalance === null) nativeBalance = 0;
 
   return {
     chain: chain.label,
