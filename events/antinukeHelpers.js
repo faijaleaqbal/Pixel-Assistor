@@ -58,10 +58,16 @@ async function sendLog(guild, cfg, client, embed) {
 
 /**
  * Apply punishment to a user (ban / kick / strip roles).
+ * Never punishes the guild owner, bot owner, configured antinuke owners, or the bot itself.
  */
 async function punish(guild, cfg, user) {
+  if (!user || !user.id || !guild) return;
+  if (user.id === guild.ownerId || (cfg.owners || []).includes(user.id)) return;
+  if (guild.members.me && user.id === guild.members.me.id) return;
+
   const member = await guild.members.fetch(user.id).catch(() => null);
   if (!member) return;
+
   if (cfg.punishment === 'ban') {
     await member.ban({ reason: 'Anti-nuke: unauthorized action' }).catch(() => {});
   } else if (cfg.punishment === 'kick') {
@@ -69,7 +75,13 @@ async function punish(guild, cfg, user) {
   } else if (cfg.punishment === 'strip') {
     if (!guild.members.me) return;
     const botHighest = guild.members.me.roles.highest;
-    await member.roles.set(member.roles.cache.filter(r => r.id === r.guild.id || r.position >= botHighest.position || r.managed).map(r => r.id)).catch(() => {});
+    await member.roles
+      .set(
+        member.roles.cache
+          .filter((r) => r.id === r.guild.id || r.position >= botHighest.position || r.managed)
+          .map((r) => r.id)
+      )
+      .catch(() => {});
   }
 }
 
@@ -77,17 +89,25 @@ async function punish(guild, cfg, user) {
  * Check if a user is exempt from anti-nuke checks.
  */
 async function isExempt(user, guild, cfg, client) {
-  if (!cfg) return true;
-  // user may be a User object (from audit log) — fetch GuildMember for roles
-  const member = user.roles
-    ? user // already a GuildMember
-    : await guild.members.fetch(user.id).catch(() => null);
-  const hasWlRole = member && cfg.wlRoles && member.roles.cache.some(r => cfg.wlRoles.includes(r.id));
-  return guild.ownerId === user.id
-    || (cfg.owners || []).includes(user.id)
-    || (cfg.whitelist || []).includes(user.id)
-    || hasWlRole
-    || user.id === client.user.id;
+  if (!cfg || !user) return true;
+  if (guild && guild.ownerId === user.id) return true;
+  if (client && client.user && user.id === client.user.id) return true;
+  if (Array.isArray(cfg.owners) && cfg.owners.includes(user.id)) return true;
+  if (Array.isArray(cfg.whitelist) && cfg.whitelist.includes(user.id)) return true;
+
+  // Check roles if guild and member available
+  if (guild && Array.isArray(cfg.wlRoles) && cfg.wlRoles.length > 0) {
+    const member = user.roles ? user : await guild.members?.fetch?.(user.id).catch(() => null);
+    if (member && member.roles) {
+      if (member.roles.cache && typeof member.roles.cache.some === 'function') {
+        if (member.roles.cache.some((r) => cfg.wlRoles.includes(r.id))) return true;
+      } else if (Array.isArray(member.roles)) {
+        if (member.roles.some((r) => cfg.wlRoles.includes(r.id || r))) return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 module.exports = { fetchAuditEntry, sendLog, punish, isExempt, RED, ORANGE, ACTION_MAP, AuditLogEvent };

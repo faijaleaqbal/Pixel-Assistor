@@ -16,19 +16,16 @@ const {
 const config = require('../../utils/config');
 const {
   parseTransaction,
-  getEvmParser,
   parseTxCommandInput,
   detectTxFormat,
-  normalizeNetworkName,
   buildTransactionEmbed,
-  EVM_CHAINS,
 } = require('../../utils/crypto');
 
 const PURPLE = 0x5865F2;
 const YELLOW = 0xFEE75C;
 const RED = 0xED4245;
 
-// In-memory state for EVM chain picker dropdown: messageId -> { hash, walletAddress, invokerId, at }
+// In-memory state for network picker dropdown: messageId -> { hash, walletAddress, invokerId, at }
 const state = new Map();
 
 const EVM_SELECT_OPTIONS = [
@@ -40,31 +37,54 @@ const EVM_SELECT_OPTIONS = [
   { value: 'optimism', label: 'Optimism',      emoji: '🔴', description: 'Optimism Mainnet (ETH)' },
 ];
 
+const HEX64_SELECT_OPTIONS = [
+  { value: 'litecoin', label: 'Litecoin', emoji: '🪙', description: 'Litecoin Mainnet (LTC)' },
+  { value: 'tron',     label: 'Tron',     emoji: '🔴', description: 'Tron Network (TRX / TRC-20)' },
+];
+
 function footerNow() {
-  return { text: `Developed by Pixel Exchange • ${new Date().toUTCString()}` };
+  return { text: `Developed by Pixel Assistant • ${new Date().toUTCString()}` };
 }
 
-function buildNetworkSelectRow() {
+function buildEvmSelectRow() {
   return new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId('txid_network_select')
       .setPlaceholder('Select EVM Network...')
-      .addOptions(EVM_SELECT_OPTIONS.map((o) => ({
-        label: o.label,
-        value: o.value,
-        emoji: o.emoji,
-        description: o.description,
-      })))
+      .addOptions(
+        EVM_SELECT_OPTIONS.map((o) => ({
+          label: o.label,
+          value: o.value,
+          emoji: o.emoji,
+          description: o.description,
+        }))
+      )
   );
 }
 
-function buildAmbiguousEmbed(hash) {
+function buildHex64SelectRow() {
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId('txid_network_select')
+      .setPlaceholder('Select Network (Litecoin / Tron)...')
+      .addOptions(
+        HEX64_SELECT_OPTIONS.map((o) => ({
+          label: o.label,
+          value: o.value,
+          emoji: o.emoji,
+          description: o.description,
+        }))
+      )
+  );
+}
+
+function buildAmbiguousEmbed(hash, type = 'EVM') {
   return new EmbedBuilder()
     .setColor(PURPLE)
     .setTitle('Select Network')
     .setDescription(
-      `This hash matches multiple EVM blockchains.\n` +
-      `Please select the network below to query:\n\n` +
+      `This hash format is shared across multiple networks (${type}).\n` +
+      `Please pick the target network below to look up this transaction:\n\n` +
       `\`\`\`${hash}\`\`\``
     )
     .setFooter(footerNow())
@@ -79,6 +99,7 @@ module.exports = {
   usage: '[network] <hash> [walletAddress]',
   cooldown: 3,
   args: true,
+
   async execute(message, args) {
     const { explicitNetwork, txIdentifier, walletAddress } = parseTxCommandInput(args);
 
@@ -92,9 +113,9 @@ module.exports = {
               `Usage: \`${config.prefix}tx [network] <hash> [walletAddress]\`\n\n` +
               `Examples:\n` +
               `• \`${config.prefix}tx polygon 0x1234...\`\n` +
-              `• \`${config.prefix}tx ltc 3PDZ25VA...\`\n` +
+              `• \`${config.prefix}tx ltc 8d5aac33...\`\n` +
               `• \`${config.prefix}tx solana 5UfgP...\`\n` +
-              `• \`${config.prefix}tx 0x1234...\``
+              `• \`${config.prefix}tx tron 3a7cab14...\``
             )
             .setFooter(footerNow()),
         ],
@@ -160,7 +181,7 @@ module.exports = {
               `• **EVM Chains:** \`0x...\` (66 hex characters)\n` +
               `• **Solana:** Base58 signature (~87-89 characters)\n` +
               `• **Litecoin / Tron:** 64 hexadecimal characters\n\n` +
-              `You can also explicitly specify the network: \`${config.prefix}tx <network> <hash>\``
+              `You can specify the network directly: \`${config.prefix}tx <network> <hash>\``
             )
             .setFooter(footerNow())
             .setTimestamp(),
@@ -170,8 +191,8 @@ module.exports = {
 
     // EVM: Ambiguous across chains -> show dropdown
     if (detected.type === 'evm') {
-      const embed = buildAmbiguousEmbed(txIdentifier);
-      const row = buildNetworkSelectRow();
+      const embed = buildAmbiguousEmbed(txIdentifier, 'EVM Chains');
+      const row = buildEvmSelectRow();
       const sent = await message.reply({ embeds: [embed], components: [row] });
       state.set(sent.id, {
         hash: txIdentifier,
@@ -226,60 +247,23 @@ module.exports = {
       }
     }
 
-    // 64-char hex: Try Tron first if configured, then Litecoin
+    // 64-char hex: Ambiguous between Litecoin and Tron -> Interactive selector
     if (detected.type === 'hex64') {
-      const statusMsg = await message.reply({
-        embeds: [
-          new EmbedBuilder()
-            .setColor(PURPLE)
-            .setDescription(`⏳ Querying blockchain (Litecoin / Tron) for hash \`${txIdentifier.slice(0, 16)}…\`…`)
-            .setFooter(footerNow()),
-        ],
+      const embed = buildAmbiguousEmbed(txIdentifier, 'Litecoin / Tron');
+      const row = buildHex64SelectRow();
+      const sent = await message.reply({ embeds: [embed], components: [row] });
+      state.set(sent.id, {
+        hash: txIdentifier,
+        walletAddress,
+        invokerId: message.author.id,
+        at: Date.now(),
       });
-
-      try {
-        let tx = null;
-        if (config.trongridApiKey) {
-          try {
-            tx = await parseTransaction('tron', txIdentifier, { walletAddress });
-          } catch {}
-        }
-        if (!tx) {
-          tx = await parseTransaction('litecoin', txIdentifier, { walletAddress });
-        }
-
-        if (!tx) {
-          return statusMsg.edit({
-            embeds: [
-              new EmbedBuilder()
-                .setColor(YELLOW)
-                .setTitle('Transaction Not Found')
-                .setDescription(`No transaction found on Litecoin or Tron for hash:\n\`\`\`${txIdentifier}\`\`\``)
-                .setFooter(footerNow())
-                .setTimestamp(),
-            ],
-          });
-        }
-
-        const embedData = buildTransactionEmbed(tx);
-        return statusMsg.edit(embedData);
-      } catch (err) {
-        console.error(`[txid] 64-hex lookup error:`, err);
-        return statusMsg.edit({
-          embeds: [
-            new EmbedBuilder()
-              .setColor(RED)
-              .setTitle('Lookup Failed')
-              .setDescription(`Unable to parse transaction:\n${err.message}`)
-              .setFooter(footerNow())
-              .setTimestamp(),
-          ],
-        });
-      }
+      setTimeout(() => state.delete(sent.id), 5 * 60_000).unref?.();
+      return;
     }
   },
 
-  // Dropdown handler for EVM network selection
+  // Dropdown handler for network selection
   async handleInteraction(interaction, client) {
     try {
       if (!interaction.isStringSelectMenu() || interaction.customId !== 'txid_network_select') return;
@@ -304,7 +288,8 @@ module.exports = {
       }
 
       const chainKey = interaction.values[0];
-      const opt = EVM_SELECT_OPTIONS.find((o) => o.value === chainKey) || { label: chainKey };
+      const allOptions = [...EVM_SELECT_OPTIONS, ...HEX64_SELECT_OPTIONS];
+      const opt = allOptions.find((o) => o.value === chainKey) || { label: chainKey };
 
       await interaction.update({
         embeds: [
@@ -352,8 +337,4 @@ module.exports = {
       console.error('[txid] handleInteraction exception:', e);
     }
   },
-};
-
-module.exports.default = async function (interaction, client) {
-  return module.exports.handleInteraction(interaction, client);
 };

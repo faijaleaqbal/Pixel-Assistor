@@ -33,12 +33,12 @@ const client = new Client({
 commandHandler.load(client);
 eventHandler.load(client);
 
-// Global error guards so the process never dies on a single rejection.
-process.on('unhandledRejection', (r) => logger.error('unhandledRejection', r?.message || r));
+// Global error guards. Unhandled rejections are logged; fatal uncaught exceptions
+// log details and exit cleanly with code 1 so PM2/systemd can restart a healthy process.
+process.on('unhandledRejection', (r) => logger.error('unhandledRejection', r?.stack || r?.message || r));
 process.on('uncaughtException', (e) => {
-  logger.error('uncaughtException', e?.stack || e?.message || e);
-  // Don't exit automatically — let pm2/systemd/Termux restart on real crashes.
-  // If the error is unrecoverable, the user can manually restart.
+  logger.error('FATAL uncaughtException — exiting for supervisor restart:', e?.stack || e?.message || e);
+  process.exit(1);
 });
 
 client.login(config.token);

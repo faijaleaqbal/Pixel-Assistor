@@ -232,7 +232,10 @@ module.exports = {
       await cmd.execute(message, args, client);
     } catch (e) {
       logger.error(`command error [${cmd.name}]`, e?.stack || e?.message || e);
-      replyError(message, `Something went wrong running \`${cmd.name}\`.\n\`\`\`${(e?.message || String(e)).slice(0, 1500)}\`\`\``);
+      replyError(
+        message,
+        `❌ An unexpected error occurred while executing \`${cmd.name}\`. Our team has been notified.`
+      );
     }
   },
 };
