@@ -15,16 +15,16 @@
 //   ?greet ping on|off
 //   ?greet autodel <seconds>
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 const { getDb } = require('../../utils/db');
 
-const E = (c, d) => new EmbedBuilder().setColor(c).setDescription(d);
+const E = (c, d) => responseBuilder.buildResult({ description: d});
 const RED = 0xED4245, GREEN = 0x57F287, BLUE = 0x5865F2, YELLOW = 0xFEE75C;
 
 const DEFAULT_MSG = 'Welcome to {server}, {user}! You are member **#{count}**.';
 
 function buildWelcomeEmbed(member, cfg, text) {
-  const embed = new EmbedBuilder().setColor(0x57F287);
+  const embed = responseBuilder.buildResult({ client: member?.client });
   if (cfg.title) embed.setTitle(cfg.title);
   if (text) embed.setDescription(text);
   if (cfg.thumbnail) embed.setThumbnail(cfg.thumbnail);
@@ -42,7 +42,7 @@ module.exports = {
   cooldown: 3,
   permissions: ['ManageChannels'],
 
-  async execute(message, args) {
+  async execute(message, args, client) {
     const db = getDb();
     const gid = message.guild.id;
     let cfg = (await db.greet.get(gid)) || { enabled: false, channels: [], message: DEFAULT_MSG, title: '', description: '', footer: '', image: '', thumbnail: '', embed: true, ping: true, autoDelete: 0 };
@@ -102,9 +102,7 @@ module.exports = {
     // ── Config ──
     if (sub === 'config') {
       const chList = cfg.channels.length ? cfg.channels.map(id => `<#${id}>`).join(', ') : '`None`';
-      return message.reply({ embeds: [new EmbedBuilder().setColor(BLUE).setTitle('Greet Configuration')
-        .addFields(
-          { name: 'Enabled', value: cfg.enabled ? '✅ Yes' : '❌ No', inline: true },
+      return message.reply({ embeds: [responseBuilder.buildResult({ title: 'Greet Configuration', fields: [{ name: 'Enabled', value: cfg.enabled ? '✅ Yes' : '❌ No', inline: true },
           { name: 'Channels', value: chList, inline: true },
           { name: 'Embed', value: cfg.embed ? '✅ On' : '❌ Off', inline: true },
           { name: 'Ping User', value: cfg.ping ? '✅ On' : '❌ Off', inline: true },
@@ -113,8 +111,7 @@ module.exports = {
           { name: 'Title', value: cfg.title ? `\`${cfg.title}\`` : '`None`', inline: false },
           { name: 'Footer', value: cfg.footer ? `\`${cfg.footer}\`` : '`None`', inline: false },
           { name: 'Thumbnail', value: cfg.thumbnail ? '[Link](' + cfg.thumbnail + ')' : '`None`', inline: false },
-          { name: 'Image', value: cfg.image ? '[Link](' + cfg.image + ')' : '`None`', inline: false },
-        ).setTimestamp()] });
+          { name: 'Image', value: cfg.image ? '[Link](' + cfg.image + ')' : '`None`', inline: false },]})] });
     }
 
     // ── Channel sub-commands ──
@@ -137,7 +134,7 @@ module.exports = {
       }
       if (action === 'show') {
         if (!cfg.channels.length) return message.reply({ embeds: [E(BLUE, 'No welcome channels set.')] });
-        return message.reply({ embeds: [new EmbedBuilder().setColor(BLUE).setTitle('Welcome Channels').setDescription(cfg.channels.map(id => `- <#${id}>`).join('\n'))] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ title: 'Welcome Channels', description: cfg.channels.map(id => `- <#${id}>`).join('\n')})] });
       }
       return message.reply({ embeds: [E(RED, 'Channel sub-commands: `add`, `remove`, `show`.')] });
     }

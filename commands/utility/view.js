@@ -1,3 +1,4 @@
+const responseBuilder = require('../../utils/responseBuilder');
 // src/commands/utility/view.js
 // ?view — Attach an .html file (or reply to a message with one) to get a shareable browser link.
 //
@@ -5,7 +6,7 @@
 // POSTs it to the separate transcript-viewer service, and returns a link.
 // The viewer must be running and VIEWER_BASE_URL must be configured in .env.
 
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const config = require('../../utils/config');
 const { getBuffer, request } = require('../../utils/http');
 
@@ -51,9 +52,7 @@ module.exports = {
     // ── 0. Config check ──
     if (!config.viewerBaseUrl) {
       return message.reply({
-        embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(
-          'Viewer service is not configured. Set `VIEWER_BASE_URL` in `.env`.'
-        )],
+        embeds: [responseBuilder.buildResult({ description: 'Viewer service is not configured. Set `VIEWER_BASE_URL` in `.env`.'})],
       });
     }
 
@@ -63,9 +62,7 @@ module.exports = {
 
     if (!found) {
       return message.reply({
-        embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(
-          'No `.html` file found. Attach an HTML file to your message, or reply to a message that has one attached.'
-        )],
+        embeds: [responseBuilder.buildResult({ description: 'No `.html` file found. Attach an HTML file to your message, or reply to a message that has one attached.'})],
       });
     }
 
@@ -76,13 +73,13 @@ module.exports = {
           || await message.client.channels.fetch(found.channelId).catch(() => null);
         if (!channel) {
           return message.reply({
-            embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Could not find the referenced channel.')],
+            embeds: [responseBuilder.buildResult({ description: 'Could not find the referenced channel.'})],
           });
         }
         const refMsg = await channel.messages.fetch(found.fetchFromReference).catch(() => null);
         if (!refMsg) {
           return message.reply({
-            embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Could not find the referenced message.')],
+            embeds: [responseBuilder.buildResult({ description: 'Could not find the referenced message.'})],
           });
         }
         htmlAttachment = refMsg.attachments.find(a =>
@@ -90,16 +87,12 @@ module.exports = {
         );
         if (!htmlAttachment) {
           return message.reply({
-            embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(
-              'The referenced message does not have an `.html` file attached.'
-            )],
+            embeds: [responseBuilder.buildResult({ description: 'The referenced message does not have an `.html` file attached.'})],
           });
         }
       } catch (e) {
         return message.reply({
-          embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(
-            `Failed to fetch the referenced message: ${e.message}`
-          )],
+          embeds: [responseBuilder.buildResult({ description: `Failed to fetch the referenced message: ${e.message}`})],
         });
       }
     } else {
@@ -110,9 +103,7 @@ module.exports = {
     const htmlBuffer = await fetchAttachmentBuffer(htmlAttachment.url);
     if (!htmlBuffer || htmlBuffer.length === 0) {
       return message.reply({
-        embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(
-          'Failed to download the HTML file. The attachment may have expired or is too large.'
-        )],
+        embeds: [responseBuilder.buildResult({ description: 'Failed to download the HTML file. The attachment may have expired or is too large.'})],
       });
     }
 
@@ -132,9 +123,7 @@ module.exports = {
       uploadResult = await res.json();
     } catch (e) {
       return message.reply({
-        embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(
-          `Viewer service error: ${e.message}`
-        )],
+        embeds: [responseBuilder.buildResult({ description: `Viewer service error: ${e.message}`})],
       });
     }
 
@@ -142,21 +131,13 @@ module.exports = {
     const viewerUrl = uploadResult.url;
     if (!viewerUrl) {
       return message.reply({
-        embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription(
-          'Viewer service returned an unexpected response (no URL).'
-        )],
+        embeds: [responseBuilder.buildResult({ description: 'Viewer service returned an unexpected response (no URL).'})],
       });
     }
 
-    const embed = new EmbedBuilder()
-      .setColor(0x57F287)
-      .setTitle('📄 HTML File Hosted')
-      .addFields(
-        { name: 'File', value: `\`${htmlAttachment.name}\``, inline: true },
+    const embed = responseBuilder.buildResult({ title: '📄 HTML File Hosted', fields: [{ name: 'File', value: `\`${htmlAttachment.name}\``, inline: true },
         { name: 'Size', value: `${(htmlBuffer.length / 1024).toFixed(1)} KB`, inline: true },
-        { name: 'Hash', value: `\`${uploadResult.file || 'unknown'}\``, inline: true },
-      )
-      .setTimestamp();
+        { name: 'Hash', value: `\`${uploadResult.file || 'unknown'}\``, inline: true },]});
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()

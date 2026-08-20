@@ -1,8 +1,8 @@
+const responseBuilder = require('../../utils/responseBuilder');
 // src/commands/games/rockpaperscissors.js
 // Play RPS vs the bot OR challenge a member. Button-based, persistent stats.
 
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
-const config = require('../../utils/config');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 const { getDb } = require('../../utils/db');
 const { resolveUserArg } = require('../../utils/resolveUser');
 
@@ -19,17 +19,13 @@ module.exports = {
   usage: '[@user|userID]',
   aliases: ['rps'],
   cooldown: 3,
-  async execute(message, args) {
+  async execute(message, args, client) {
     const target = args && args[0]
       ? (await resolveUserArg(message, args[0], { silent: true }))
       : null;
     const vsBot = !target || target.id === message.author.id;
 
-    const embed = new EmbedBuilder()
-      .setColor(config.embedColor)
-      .setTitle('✊ ✋ ✌️ Rock / Paper / Scissors')
-      .setDescription(vsBot ? `Playing vs the bot. <@${message.author.id}>, pick your move!` : `Challenge: <@${message.author.id}> vs <@${target.id}>.\n<@${message.author.id}>, pick your move.`)
-      .setTimestamp();
+    const embed = responseBuilder.buildResult({ title: '✊ ✋ ✌️ Rock / Paper / Scissors', description: vsBot ? `Playing vs the bot. <@${message.author.id}>, pick your move!` : `Challenge: <@${message.author.id}> vs <@${target.id}>.\n<@${message.author.id}>, pick your move.`});
 
     const row = new ActionRowBuilder().addComponents(
       CHOICES.map((c) => new ButtonBuilder().setCustomId(`rps_${c.id}`).setLabel(c.label).setEmoji(c.emoji).setStyle(ButtonStyle.Primary)),
@@ -69,7 +65,7 @@ module.exports = {
     });
     collector.on('end', async (_c, reason) => {
       if (reason !== 'done') {
-        await sent.edit({ embeds: [new EmbedBuilder().setColor(0xED4245).setTitle('RPS — timed out')], components: [] }).catch(() => {});
+        await sent.edit({ embeds: [responseBuilder.buildResult({ title: 'RPS — timed out'})], components: [] }).catch(() => {});
       }
     });
   },
@@ -99,6 +95,6 @@ async function finish(message, sent, p1, p2, c1, c2, result) {
       else if (result === 'p1') { text = `<@${p1}> wins! ${c1} beats ${c2}.`; await db.rpsStat.inc(p1, message.guild.id, 'wins'); await db.rpsStat.inc(p2, message.guild.id, 'losses'); }
       else { text = `<@${p2}> wins! ${c2} beats ${c1}.`; await db.rpsStat.inc(p2, message.guild.id, 'wins'); await db.rpsStat.inc(p1, message.guild.id, 'losses'); }
     }
-    await sent.edit({ embeds: [new EmbedBuilder().setColor(config.embedColor).setTitle('RPS — result').setDescription(text)], components: [], allowedMentions: { parse: [] } });
+    await sent.edit({ embeds: [responseBuilder.buildResult({ title: 'RPS — result', description: text})], components: [], allowedMentions: { parse: [] } });
   } catch (e) { console.error('[rps] finish error:', e.message); }
 }

@@ -1,6 +1,6 @@
 // src/commands/moderation/unlock.js
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 const { sendTempReply } = require('../../utils/tempReply');
 
 module.exports = {
@@ -14,6 +14,6 @@ module.exports = {
   async execute(message) {
     const everyone = message.guild.roles.everyone;
     await message.channel.permissionOverwrites.edit(everyone, { SendMessages: null });
-    return sendTempReply(message, { embeds: [new EmbedBuilder().setColor(0x57F287).setDescription('🔓 Channel unlocked.')] });
+    return sendTempReply(message, { embeds: [responseBuilder.buildResult({ description: '🔓 Channel unlocked.'})] });
   },
 };

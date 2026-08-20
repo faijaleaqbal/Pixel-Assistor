@@ -1,6 +1,6 @@
 // src/commands/moderation/unban.js
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 const { resolveUserArg } = require('../../utils/resolveUser');
 
 module.exports = {
@@ -12,16 +12,16 @@ module.exports = {
   cooldown: 3,
   permissions: ['BanMembers'],
   args: true,
-  async execute(message, args) {
+  async execute(message, args, client) {
     // Resolve via mention or raw ID (Bans.fetch will reject if not banned).
     const target = await resolveUserArg(message, args[0]);
     if (!target) return;
     const reason = args.slice(1).filter(a => !/^<@!?\d+>$/.test(a) && !/^\d{17,19}$/.test(a)).join(' ') || 'No reason provided';
     try {
       await message.guild.bans.remove(target.id, reason);
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Unbanned ${target.tag} — ${reason}`)] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Unbanned ${target.tag} — ${reason}`})] });
     } catch (e) {
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`Failed: ${e.message}`)] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: `Failed: ${e.message}`})] });
     }
   },
 };

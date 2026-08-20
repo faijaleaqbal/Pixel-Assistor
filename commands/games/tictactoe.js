@@ -1,7 +1,8 @@
+const responseBuilder = require('../../utils/responseBuilder');
 // src/commands/games/tictactoe.js
 // Play tic-tac-toe against another member using a button-based 3x3 board.
 
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 const config = require('../../utils/config');
 const { resolveUserArg } = require('../../utils/resolveUser');
 
@@ -20,11 +21,11 @@ module.exports = {
   aliases: ['ttt'],
   cooldown: 5,
   args: true,
-  async execute(message, args) {
+  async execute(message, args, client) {
     const opponent = await resolveUserArg(message, args[0]);
     if (!opponent) return;
     if (opponent.bot || opponent.id === message.author.id) {
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`Mention a valid opponent.\nUsage: \`${config.prefix}tictactoe <@user|userID>\``)] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: `Mention a valid opponent.\nUsage: \`${config.prefix}tictactoe <@user|userID>\``})] });
     }
 
     const board = Array(9).fill(null);
@@ -52,11 +53,7 @@ module.exports = {
       return rows;
     };
 
-    const embed = () => new EmbedBuilder()
-      .setColor(config.embedColor)
-      .setTitle('❌⭕ Tic-Tac-Toe')
-      .setDescription(`<@${players.X}> (❌) vs <@${players.O}> (⭕)\nTurn: <@${turn}>`)
-      .setTimestamp();
+    const embed = () => responseBuilder.buildResult({ title: '❌⭕ Tic-Tac-Toe', description: `<@${players.X}> (❌) vs <@${players.O}> (⭕)\nTurn: <@${turn}>`});
 
     const sent = await message.reply({ embeds: [embed()], components: mkRows(), allowedMentions: { parse: [] } });
 
@@ -78,7 +75,7 @@ module.exports = {
         }
         if (board.every(Boolean)) {
           collector.stop('draw');
-          await i.update({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setTitle('Tic-Tac-Toe — Draw!').setDescription('No winner.')], components: mkRowsFinal(board) });
+          await i.update({ embeds: [responseBuilder.buildResult({ title: 'Tic-Tac-Toe — Draw!', description: 'No winner.'})], components: mkRowsFinal(board) });
           return;
         }
         turn = turn === players.X ? players.O : players.X;
@@ -87,7 +84,7 @@ module.exports = {
     });
     collector.on('end', async (_c, reason) => {
       if (reason !== 'win' && reason !== 'draw') {
-        await sent.edit({ embeds: [new EmbedBuilder().setColor(0xED4245).setTitle('Tic-Tac-Toe — timed out')], components: [] }).catch(() => {});
+        await sent.edit({ embeds: [responseBuilder.buildResult({ title: 'Tic-Tac-Toe — timed out'})], components: [] }).catch(() => {});
       }
     });
   },
@@ -105,10 +102,7 @@ function checkWin(b) {
 }
 
 function winEmbed(p1, p2, winnerId) {
-  return new EmbedBuilder()
-    .setColor(0x57F287)
-    .setTitle('Tic-Tac-Toe — Win!')
-    .setDescription(`🎉 <@${winnerId}> wins!\n<@${p1.id}> (❌) vs <@${p2.id}> (⭕)`);
+  return responseBuilder.buildResult({ title: 'Tic-Tac-Toe — Win!', description: `🎉 <@${winnerId}> wins!\n<@${p1.id}> (❌) vs <@${p2.id}> (⭕)`});
 }
 
 function mkRowsFinal(board, winningSymbol) {

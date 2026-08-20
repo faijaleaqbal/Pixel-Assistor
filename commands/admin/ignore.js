@@ -10,11 +10,11 @@
 //   ?ignore bypass channel add|remove|show <#channel>
 //   ?ignore bypass user add|remove|show <@user>
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 const { getDb } = require('../../utils/db');
 const { resolveUserArg } = require('../../utils/resolveUser');
 
-const E = (c, d) => new EmbedBuilder().setColor(c).setDescription(d);
+const E = (c, d) => responseBuilder.buildResult({ description: d});
 const RED = 0xED4245, GREEN = 0x57F287, BLUE = 0x5865F2;
 
 const TYPES = ['channel', 'user', 'command', 'module'];
@@ -28,7 +28,7 @@ module.exports = {
   cooldown: 3,
   permissions: ['Administrator'],
 
-  async execute(message, args) {
+  async execute(message, args, client) {
     const db = getDb();
     const gid = message.guild.id;
 
@@ -38,14 +38,12 @@ module.exports = {
       for (const t of [...TYPES, 'bypass_channel', 'bypass_user']) {
         try { counts[t] = (await db.ignored.list(gid, t)).length; } catch { counts[t] = 0; }
       }
-      return message.reply({ embeds: [new EmbedBuilder().setColor(BLUE).setTitle('Ignore Summary').setDescription(
-        '**Channels:** ' + counts.channel + ' ignored\n' +
+      return message.reply({ embeds: [responseBuilder.buildResult({ title: 'Ignore Summary', description: '**Channels:** ' + counts.channel + ' ignored\n' +
         '**Users:** ' + counts.user + ' ignored\n' +
         '**Commands:** ' + counts.command + ' ignored\n' +
         '**Modules:** ' + counts.module + ' ignored\n' +
         '**Bypass Channels:** ' + counts.bypass_channel + '\n' +
-        '**Bypass Users:** ' + counts.bypass_user
-      )] });
+        '**Bypass Users:** ' + counts.bypass_user})] });
     }
 
     const sub = args[0].toLowerCase();
@@ -72,7 +70,7 @@ async function handleType(message, args, gid, db, dbType, label) {
     try { items = await db.ignored.list(gid, dbType); } catch { items = []; }
     if (!items || !items.length) return message.reply({ embeds: [E(BLUE, 'No ignored **' + label + '** entries.')] });
     const lines = items.map((target, i) => (i + 1) + '. ' + target).join('\n');
-    return message.reply({ embeds: [new EmbedBuilder().setColor(BLUE).setTitle('Ignored ' + label + 's (' + items.length + ')').setDescription(lines)] });
+    return message.reply({ embeds: [responseBuilder.buildResult({ title: 'Ignored ' + label + 's (' + items.length + ')', description: lines})] });
   }
 
   if (action === 'add') {

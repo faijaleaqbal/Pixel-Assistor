@@ -1,5 +1,6 @@
+const responseBuilder = require('../../utils/responseBuilder');
 // src/commands/admin/backup.js
-const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
+const { AttachmentBuilder } = require('discord.js');
 
 module.exports = {
   name: 'backup', category: 'admin', description: 'Backup server settings to a JSON file.', usage: '', cooldown: 10, ownerOnly: true,
@@ -12,6 +13,6 @@ module.exports = {
     };
     const buf = Buffer.from(JSON.stringify(data, null, 2));
     const att = new AttachmentBuilder(buf, { name: `backup-${g.id}-${Date.now()}.json` });
-    return message.reply({ files: [att], embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Backup created — ${data.roles.length} roles, ${data.channels.length} channels.`)] });
+    return message.reply({ files: [att], embeds: [responseBuilder.buildResult({ description: `✅ Backup created — ${data.roles.length} roles, ${data.channels.length} channels.`})] });
   },
 };

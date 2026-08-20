@@ -2,13 +2,13 @@
 // Voice channel management. 17 subcommands.
 // All require MoveMembers except `voice request`. Accepts @user or raw userID everywhere.
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 const { resolveMemberArg } = require('../../utils/resolveUser');
 const { canManageMember } = require('../../utils/perms');
 
 function needVoice(message) {
   if (!message.member.voice.channel) {
-    message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('You must be in a voice channel.')] });
+    message.reply({ embeds: [responseBuilder.buildResult({ description: 'You must be in a voice channel.'})] });
     return false;
   }
   return true;
@@ -19,7 +19,7 @@ async function needTarget(message, args, actionName = 'moderate') {
   if (!target) return null;
   const check = canManageMember(message.member, target, message.guild, { actionName: `voice-${actionName}` });
   if (!check.ok) {
-    message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`❌ ${check.error}`)] });
+    message.reply({ embeds: [responseBuilder.buildResult({ description: `❌ ${check.error}`})] });
     return null;
   }
   return target;
@@ -36,12 +36,12 @@ module.exports = {
   usage: 'kick|kickall|mute|muteall|unmute|unmuteall|deafen|deafenall|undeafen|undeafenall|moveall|pull|pullall|invite|ban|request',
   cooldown: 3,
   permissions: ['MoveMembers'],
-  async execute(message, args) {
+  async execute(message, args, client) {
     const sub = (args[0] || '').toLowerCase();
 
     // ?voice request — no special perms needed
     if (sub === 'request') {
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('Coming soon.')] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: 'Coming soon.'})] });
     }
 
     // ── kick ──
@@ -51,9 +51,9 @@ module.exports = {
       if (!target) return;
       try {
         await target.voice.disconnect('Voice kick by ' + message.author.tag);
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Disconnected ${target.user.tag}.`)] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Disconnected ${target.user.tag}.`})] });
       } catch {
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Failed to disconnect that user.')] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: 'Failed to disconnect that user.'})] });
       }
     }
 
@@ -62,12 +62,12 @@ module.exports = {
       if (!needVoice(message)) return;
       const vc = getMyChannel(message);
       const members = vc.members.filter(m => !m.user.bot && m.id !== message.author.id);
-      if (!members.size) return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('No users to kick.')] });
+      if (!members.size) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'No users to kick.'})] });
       let count = 0;
       for (const [, m] of members) {
         try { await m.voice.disconnect('Voice kickall by ' + message.author.tag); count++; } catch { /* skip */ }
       }
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Disconnected ${count} user(s).`)] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Disconnected ${count} user(s).`})] });
     }
 
     // ── mute ──
@@ -77,9 +77,9 @@ module.exports = {
       if (!target) return;
       try {
         await target.voice.setMute(true);
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Server-muted ${target.user.tag}.`)] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Server-muted ${target.user.tag}.`})] });
       } catch {
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Failed to mute that user.')] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: 'Failed to mute that user.'})] });
       }
     }
 
@@ -88,12 +88,12 @@ module.exports = {
       if (!needVoice(message)) return;
       const vc = getMyChannel(message);
       const members = vc.members.filter(m => !m.user.bot && m.id !== message.author.id);
-      if (!members.size) return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('No users to mute.')] });
+      if (!members.size) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'No users to mute.'})] });
       let count = 0;
       for (const [, m] of members) {
         try { await m.voice.setMute(true); count++; } catch { /* skip */ }
       }
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Server-muted ${count} user(s).`)] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Server-muted ${count} user(s).`})] });
     }
 
     // ── unmute ──
@@ -103,9 +103,9 @@ module.exports = {
       if (!target) return;
       try {
         await target.voice.setMute(false);
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Server-unmuted ${target.user.tag}.`)] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Server-unmuted ${target.user.tag}.`})] });
       } catch {
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Failed to unmute that user.')] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: 'Failed to unmute that user.'})] });
       }
     }
 
@@ -114,12 +114,12 @@ module.exports = {
       if (!needVoice(message)) return;
       const vc = getMyChannel(message);
       const members = vc.members.filter(m => !m.user.bot);
-      if (!members.size) return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('No users to unmute.')] });
+      if (!members.size) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'No users to unmute.'})] });
       let count = 0;
       for (const [, m] of members) {
         try { await m.voice.setMute(false); count++; } catch { /* skip */ }
       }
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Server-unmuted ${count} user(s).`)] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Server-unmuted ${count} user(s).`})] });
     }
 
     // ── deafen ──
@@ -129,9 +129,9 @@ module.exports = {
       if (!target) return;
       try {
         await target.voice.setDeaf(true);
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Server-deafened ${target.user.tag}.`)] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Server-deafened ${target.user.tag}.`})] });
       } catch {
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Failed to deafen that user.')] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: 'Failed to deafen that user.'})] });
       }
     }
 
@@ -140,12 +140,12 @@ module.exports = {
       if (!needVoice(message)) return;
       const vc = getMyChannel(message);
       const members = vc.members.filter(m => !m.user.bot && m.id !== message.author.id);
-      if (!members.size) return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('No users to deafen.')] });
+      if (!members.size) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'No users to deafen.'})] });
       let count = 0;
       for (const [, m] of members) {
         try { await m.voice.setDeaf(true); count++; } catch { /* skip */ }
       }
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Server-deafened ${count} user(s).`)] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Server-deafened ${count} user(s).`})] });
     }
 
     // ── undeafen ──
@@ -155,9 +155,9 @@ module.exports = {
       if (!target) return;
       try {
         await target.voice.setDeaf(false);
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Server-undeafened ${target.user.tag}.`)] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Server-undeafened ${target.user.tag}.`})] });
       } catch {
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Failed to undeafen that user.')] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: 'Failed to undeafen that user.'})] });
       }
     }
 
@@ -166,12 +166,12 @@ module.exports = {
       if (!needVoice(message)) return;
       const vc = getMyChannel(message);
       const members = vc.members.filter(m => !m.user.bot);
-      if (!members.size) return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('No users to undeafen.')] });
+      if (!members.size) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'No users to undeafen.'})] });
       let count = 0;
       for (const [, m] of members) {
         try { await m.voice.setDeaf(false); count++; } catch { /* skip */ }
       }
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Server-undeafened ${count} user(s).`)] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Server-undeafened ${count} user(s).`})] });
     }
 
     // ── moveall <@user|userID> ── move all from user's voice channel to YOUR voice channel
@@ -179,15 +179,15 @@ module.exports = {
       if (!needVoice(message)) return;
       const target = await needTarget(message, args, 'move');
       if (!target) return;
-      if (!target.voice.channel) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('That user is not in a voice channel.')] });
+      if (!target.voice.channel) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'That user is not in a voice channel.'})] });
       const dest = getMyChannel(message);
       const members = target.voice.channel.members.filter(m => !m.user.bot);
-      if (!members.size) return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('No users to move.')] });
+      if (!members.size) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'No users to move.'})] });
       let count = 0;
       for (const [, m] of members) {
         try { await m.voice.setChannel(dest); count++; } catch { /* skip */ }
       }
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Moved ${count} user(s) to ${dest.name}.`)] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Moved ${count} user(s) to ${dest.name}.`})] });
     }
 
     // ── pull <@user|userID> ── move user to YOUR voice channel
@@ -195,12 +195,12 @@ module.exports = {
       if (!needVoice(message)) return;
       const target = await needTarget(message, args, 'pull');
       if (!target) return;
-      if (!target.voice.channel) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('That user is not in a voice channel.')] });
+      if (!target.voice.channel) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'That user is not in a voice channel.'})] });
       try {
         await target.voice.setChannel(getMyChannel(message));
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Pulled ${target.user.tag} to your channel.`)] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Pulled ${target.user.tag} to your channel.`})] });
       } catch {
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Failed to move that user.')] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: 'Failed to move that user.'})] });
       }
     }
 
@@ -209,15 +209,15 @@ module.exports = {
       if (!needVoice(message)) return;
       const target = await needTarget(message, args, 'pull');
       if (!target) return;
-      if (!target.voice.channel) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('That user is not in a voice channel.')] });
+      if (!target.voice.channel) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'That user is not in a voice channel.'})] });
       const dest = getMyChannel(message);
       const members = target.voice.channel.members.filter(m => !m.user.bot);
-      if (!members.size) return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('No users to pull.')] });
+      if (!members.size) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'No users to pull.'})] });
       let count = 0;
       for (const [, m] of members) {
         try { await m.voice.setChannel(dest); count++; } catch { /* skip */ }
       }
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Pulled ${count} user(s) to ${dest.name}.`)] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Pulled ${count} user(s) to ${dest.name}.`})] });
     }
 
     // ── invite <@user|userID> ── create invite to your voice channel
@@ -226,9 +226,9 @@ module.exports = {
       const vc = getMyChannel(message);
       try {
         const invite = await vc.createInvite({ maxAge: 86400, maxUses: 1, reason: 'Voice invite by ' + message.author.tag });
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Invite created: ${invite.url}`)] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Invite created: ${invite.url}`})] });
       } catch {
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Failed to create invite.')] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: 'Failed to create invite.'})] });
       }
     }
 
@@ -241,12 +241,12 @@ module.exports = {
       try {
         await target.voice.disconnect('Voice ban by ' + message.author.tag);
         await vc.permissionOverwrites.edit(target.id, { Connect: false });
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Voice-banned ${target.user.tag} from ${vc.name}.`)] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Voice-banned ${target.user.tag} from ${vc.name}.`})] });
       } catch {
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Failed to voice-ban that user.')] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: 'Failed to voice-ban that user.'})] });
       }
     }
 
-    return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Unknown subcommand.')] });
+    return message.reply({ embeds: [responseBuilder.buildResult({ description: 'Unknown subcommand.'})] });
   },
 };

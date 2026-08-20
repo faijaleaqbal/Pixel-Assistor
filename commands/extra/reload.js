@@ -5,7 +5,7 @@
 //   - If DEPLOY_MANAGER=termux, exit(0) — assumes an external `while true; do node ...; done` loop.
 // All three rely on an external supervisor — the bot itself never re-spawns.
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 const config = require('../../utils/config');
 const { isOwner } = require('../../utils/perms');
 const logger = require('../../utils/logger');
@@ -21,10 +21,7 @@ module.exports = {
   async execute(message) {
     if (!isOwner(message.author.id)) return;
     const mgr = config.deployManager;
-    await message.reply({ embeds: [new EmbedBuilder()
-      .setColor(0x57F287)
-      .setDescription(`🔄 Restarting now (deploy manager: \`${mgr}\`). Back in a few seconds.`)
-      .setTimestamp()] });
+    await message.reply({ embeds: [responseBuilder.buildResult({ description: `🔄 Restarting now (deploy manager: \`${mgr}\`). Back in a few seconds.`})] });
 
     logger.warn(`reload triggered by owner — manager=${mgr}`);
     // Give the reply a moment to flush.

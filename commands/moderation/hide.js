@@ -1,6 +1,6 @@
 // src/commands/moderation/hide.js
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 
 module.exports = {
   name: 'hide',
@@ -12,6 +12,6 @@ module.exports = {
   permissions: ['ManageChannels'],
   async execute(message) {
     await message.channel.permissionOverwrites.edit(message.guild.roles.everyone, { ViewChannel: false });
-    return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription('🙈 Channel hidden from @everyone.')] });
+    return message.reply({ embeds: [responseBuilder.buildResult({ description: '🙈 Channel hidden from @everyone.'})] });
   },
 };

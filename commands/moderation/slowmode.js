@@ -1,6 +1,6 @@
 // src/commands/moderation/slowmode.js
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 
 module.exports = {
   name: 'slowmode',
@@ -11,14 +11,14 @@ module.exports = {
   cooldown: 3,
   permissions: ['ManageChannels'],
   args: true,
-  async execute(message, args) {
+  async execute(message, args, client) {
     const v = args[0].toLowerCase() === 'off' ? 0 : parseInt(args[0], 10);
     if (Number.isNaN(v) || v < 0 || v > 21600) return message.reply('Value must be 0-21600 seconds.');
     try {
       await message.channel.setRateLimitPerUser(v);
     } catch (e) {
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`Failed to set slowmode: **${e.message}**`)] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: `Failed to set slowmode: **${e.message}**`})] });
     }
-    return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`🐢 Slowmode set to ${v}s.`)] });
+    return message.reply({ embeds: [responseBuilder.buildResult({ description: `🐢 Slowmode set to ${v}s.`})] });
   },
 };

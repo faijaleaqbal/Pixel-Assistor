@@ -1,10 +1,11 @@
+const responseBuilder = require('../../utils/responseBuilder');
 // src/commands/extra/sync.js
 // Sync application (slash) commands. Owner-only.
 //   ?sync        -> guild-only slash commands for the dev guild
 //   ?sync global -> global slash commands (takes up to 1h to propagate)
 //   ?sync clear  -> remove all slash commands from the dev guild
 
-const { EmbedBuilder, REST, Routes } = require('discord.js');
+const { REST, Routes } = require('discord.js');
 const config = require('../../utils/config');
 const { isOwner } = require('../../utils/perms');
 const { all } = require('../../utils/commandMeta');
@@ -17,7 +18,7 @@ module.exports = {
   usage: '[global|clear]',
   cooldown: 5,
   ownerOnly: true,
-  async execute(message, args) {
+  async execute(message, args, client) {
     if (!isOwner(message.author.id)) return;
     if (!config.clientId) return message.reply('`CLIENT_ID` missing in .env.');
     const m = await message.reply('⏳ Syncing…');
@@ -62,5 +63,5 @@ module.exports = {
   },
 };
 
-function ok(text) { return new EmbedBuilder().setColor(0x57F287).setDescription(text).setTimestamp(); }
-function err(text) { return new EmbedBuilder().setColor(0xED4245).setDescription('Sync failed: ' + text).setTimestamp(); }
+function ok(text) { return responseBuilder.buildResult({ description: text}); }
+function err(text) { return responseBuilder.buildResult({ description: 'Sync failed: ' + text}); }

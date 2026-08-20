@@ -1,8 +1,7 @@
 // src/commands/utility/status.js
 // Owner only. Set bot presence status.
 
-const { EmbedBuilder } = require('discord.js');
-const config = require('../../utils/config');
+const responseBuilder = require('../../utils/responseBuilder');
 
 module.exports = {
   name: 'status',
@@ -11,20 +10,14 @@ module.exports = {
   usage: '<online|idle|dnd|invisible> [custom text]',
   cooldown: 3,
   ownerOnly: true,
-  async execute(message, args) {
+  async execute(message, args, client) {
 
     const validStatuses = ['online', 'idle', 'dnd', 'invisible'];
     const currentStatus = message.client.user.presence.status;
 
     if (!args[0]) {
-      const embed = new EmbedBuilder()
-        .setColor(config.embedColor)
-        .setTitle('🟢 Current Status')
-        .addFields(
-          { name: 'Status', value: currentStatus, inline: true },
-          { name: 'Activity', value: message.client.user.presence.activities[0]?.name || 'None', inline: true },
-        )
-        .setTimestamp();
+      const embed = responseBuilder.buildResult({ title: '🟢 Current Status', fields: [{ name: 'Status', value: currentStatus, inline: true },
+          { name: 'Activity', value: message.client.user.presence.activities[0]?.name || 'None', inline: true },]});
       return message.reply({ embeds: [embed] });
     }
 
@@ -41,14 +34,8 @@ module.exports = {
 
     await message.client.user.setPresence(presence);
 
-    const embed = new EmbedBuilder()
-      .setColor(0x57F287)
-      .setTitle('✅ Status Updated')
-      .addFields(
-        { name: 'Status', value: statusInput, inline: true },
-        { name: 'Custom Text', value: customText || 'None', inline: true },
-      )
-      .setTimestamp();
+    const embed = responseBuilder.buildResult({ title: '✅ Status Updated', fields: [{ name: 'Status', value: statusInput, inline: true },
+        { name: 'Custom Text', value: customText || 'None', inline: true },]});
 
     return message.reply({ embeds: [embed] });
   },

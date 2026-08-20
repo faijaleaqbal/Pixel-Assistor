@@ -1,4 +1,4 @@
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 const { resolveUserArg } = require('../../utils/resolveUser');
 const { canManageMember, checkBotPermissions } = require('../../utils/perms');
 const logger = require('../../utils/logger');
@@ -12,7 +12,7 @@ module.exports = {
   permissions: ['BanMembers'],
   args: true,
 
-  async execute(message, args) {
+  async execute(message, args, client) {
     const targetUser = await resolveUserArg(message, args[0]);
     if (!targetUser) return;
 
@@ -20,7 +20,7 @@ module.exports = {
     const botCheck = checkBotPermissions(message, ['BanMembers']);
     if (!botCheck.ok) {
       return message.reply({
-        embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('❌ I do not have permission to **Ban Members** in this server.')],
+        embeds: [responseBuilder.buildResult({ description: '❌ I do not have permission to **Ban Members** in this server.'})],
       });
     }
 
@@ -29,31 +29,31 @@ module.exports = {
     if (member) {
       const check = canManageMember(message.member, member, message.guild, { actionName: 'ban' });
       if (!check.ok) {
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`❌ ${check.error}`)] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: `❌ ${check.error}`})] });
       }
       if (!member.bannable) {
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('❌ I cannot ban that member — their highest role is equal to or above my highest role.')] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: '❌ I cannot ban that member — their highest role is equal to or above my highest role.'})] });
       }
     } else {
       // User is not in the guild (hackban/ID ban)
       if (targetUser.id === message.guild.ownerId) {
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('❌ You cannot ban the server owner.')] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: '❌ You cannot ban the server owner.'})] });
       }
       if (targetUser.id === message.author.id) {
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('❌ You cannot ban yourself.')] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: '❌ You cannot ban yourself.'})] });
       }
       if (targetUser.id === message.client.user.id) {
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('❌ I cannot ban myself.')] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: '❌ I cannot ban myself.'})] });
       }
     }
 
     const reason = args.slice(1).filter((a) => !/^<@!?\d+>$/.test(a)).join(' ') || 'No reason provided';
     try {
       await message.guild.bans.create(targetUser.id, { reason: `${reason} (by ${message.author.tag})` });
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`🔨 Banned **${targetUser.tag}** — ${reason}`)] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: `🔨 Banned **${targetUser.tag}** — ${reason}`})] });
     } catch (e) {
       logger.error('ban error', e?.stack || e?.message || e);
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('❌ Failed to ban this user. Please check role hierarchy and permissions.')] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: '❌ Failed to ban this user. Please check role hierarchy and permissions.'})] });
     }
   },
 };

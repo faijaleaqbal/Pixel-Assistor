@@ -1,6 +1,6 @@
 // src/commands/moderation/channelrename.js
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 
 module.exports = {
   name: 'channelrename',
@@ -11,11 +11,11 @@ module.exports = {
   cooldown: 3,
   permissions: ['ManageChannels'],
   args: true,
-  async execute(message, args) {
+  async execute(message, args, client) {
     const ch = message.mentions.channels.first() || message.channel;
     const name = args.slice(message.mentions.channels.first() ? 1 : 0).join('-').toLowerCase();
     if (!name) return message.reply('Provide a new name.');
     await ch.setName(name);
-    return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Renamed to \`${name}\`.`)] });
+    return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Renamed to \`${name}\`.`})] });
   },
 };

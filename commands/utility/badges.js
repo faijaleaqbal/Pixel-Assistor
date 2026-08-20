@@ -1,8 +1,8 @@
+const responseBuilder = require('../../utils/responseBuilder');
 // src/commands/utility/badges.js
 // Show a user's Discord badges.
 
-const { EmbedBuilder, UserFlagsBitField } = require('discord.js');
-const config = require('../../utils/config');
+const { UserFlagsBitField } = require('discord.js');
 const { resolveUserArg } = require('../../utils/resolveUser');
 
 const FLAG_NAMES = {
@@ -26,7 +26,7 @@ module.exports = {
   description: "Show a user's Discord badges. Accepts @user or raw userID.",
   usage: '[@user|userID]',
   cooldown: 3,
-  async execute(message, args) {
+  async execute(message, args, client) {
     const target = args && args[0]
       ? (await resolveUserArg(message, args[0], { silent: true })) || message.author
       : message.author;
@@ -39,11 +39,7 @@ module.exports = {
 
     const flags = user.flags;
     if (!flags || flags.bitfield === 0n) {
-      return message.reply({ embeds: [new EmbedBuilder()
-        .setColor(0xFEE75C)
-        .setTitle(`🎖️ ${user.tag}'s Badges`)
-        .setDescription('This user has no badges.')
-        .setTimestamp()], allowedMentions: { parse: [] } });
+      return message.reply({ embeds: [responseBuilder.buildResult({ title: `🎖️ ${user.tag}'s Badges`, description: 'This user has no badges.'})], allowedMentions: { parse: [] } });
     }
 
     const badgeList = [];
@@ -51,12 +47,7 @@ module.exports = {
       if (flags.has(Number(bit))) badgeList.push(name);
     }
 
-    const embed = new EmbedBuilder()
-      .setColor(config.embedColor)
-      .setTitle(`🎖️ ${user.tag}'s Badges`)
-      .setDescription(badgeList.join('\n') || 'No known badges.')
-      .setThumbnail(user.displayAvatarURL({ size: 256 }))
-      .setTimestamp();
+    const embed = responseBuilder.buildResult({ title: `🎖️ ${user.tag}'s Badges`, description: badgeList.join('\n') || 'No known badges.', thumbnail: user.displayAvatarURL({ size: 256 })});
 
     return message.reply({ embeds: [embed], allowedMentions: { parse: [] } });
   },

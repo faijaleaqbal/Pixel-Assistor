@@ -3,8 +3,7 @@
 // Usage: ?settimer <duration> [reason]
 // Duration format: <number><unit> where unit = s, m, h, d, w, y
 
-const { EmbedBuilder } = require('discord.js');
-const config = require('../../utils/config');
+const responseBuilder = require('../../utils/responseBuilder');
 const { getDb } = require('../../utils/db');
 const ms = require('../../utils/ms');
 const logger = require('../../utils/logger');
@@ -16,15 +15,13 @@ module.exports = {
   usage: '<1s/1m/1h/1d/1w/1y> [reason]',
   cooldown: 3,
   args: true,
-  async execute(message, args) {
+  async execute(message, args, client) {
     const durMs = ms.parse(args[0]);
     if (!durMs || durMs < 1000) {
       return message.reply({
-        embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(
-          'Invalid duration. Usage: `?settimer <duration> [reason]`\n' +
+        embeds: [responseBuilder.buildResult({ description: 'Invalid duration. Usage: `?settimer <duration> [reason]`\n' +
           'Format: `<number><unit>` where unit = `s`, `m`, `h`, `d`, `w`, `y`\n' +
-          'Examples: `?settimer 30s`, `?settimer 5m Standup call`, `?settimer 1h`, `?settimer 2d`'
-        )],
+          'Examples: `?settimer 30s`, `?settimer 5m Standup call`, `?settimer 1h`, `?settimer 2d`'})],
       });
     }
 
@@ -33,12 +30,7 @@ module.exports = {
     const triggerAt = now + durMs;
     const triggerUnix = Math.floor(triggerAt / 1000);
 
-    const timerEmbed = new EmbedBuilder()
-      .setColor(config.embedColor)
-      .setTitle('⏳ Timer')
-      .setDescription(`**${reason}** — ends <t:${triggerUnix}:R>`)
-      .setFooter({ text: `Set by ${message.author.tag}` })
-      .setTimestamp();
+    const timerEmbed = responseBuilder.buildResult({ title: '⏳ Timer', description: `**${reason}** — ends <t:${triggerUnix}:R>`});
 
     const sent = await message.reply({ embeds: [timerEmbed] });
 

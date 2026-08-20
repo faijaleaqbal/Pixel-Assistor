@@ -1,7 +1,7 @@
 // src/commands/moderation/rrole.js
 // Remove role variants: single user, all humans, all bots. Batch of 20 with progress embed.
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 const { resolveMemberArg } = require('../../utils/resolveUser');
 
 const pendingBatches = new Map();
@@ -14,7 +14,7 @@ module.exports = {
   cooldown: 3,
   permissions: ['ManageRoles'],
   args: true,
-  async execute(message, args) {
+  async execute(message, args, client) {
     const action = args[0]?.toLowerCase();
 
     // Cancel pending batch
@@ -22,15 +22,15 @@ module.exports = {
       const key = `${message.guild.id}:${message.author.id}`;
       if (pendingBatches.get(key)) {
         pendingBatches.delete(key);
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('⏹️ Pending batch removal cancelled.')] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: '⏹️ Pending batch removal cancelled.'})] });
       }
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('No pending batch to cancel.')] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: 'No pending batch to cancel.'})] });
     }
 
     const role = message.mentions.roles.first();
-    if (!role) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Mention a role to remove.')] });
+    if (!role) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'Mention a role to remove.'})] });
     if (role.position >= message.guild.members.me.roles.highest.position) {
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('That role is too high in the hierarchy.')] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: 'That role is too high in the hierarchy.'})] });
     }
 
     // Single user — accept @mention OR raw user ID.
@@ -39,9 +39,9 @@ module.exports = {
       if (!target) return;
       try {
         await target.roles.remove(role);
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Removed ${role} from ${target.user.tag}`)] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Removed ${role} from ${target.user.tag}`})] });
       } catch (err) {
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`Failed: ${err.message}`)] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: `Failed: ${err.message}`})] });
       }
     }
 
@@ -55,11 +55,11 @@ module.exports = {
     const list = members.map(m => m);
     if (!list.length) {
       const label = action === 'bots' ? 'bots' : action === 'humans' ? 'humans' : 'members';
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription(`No ${label} have ${role}.`)] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: `No ${label} have ${role}.`})] });
     }
     const key = `${message.guild.id}:${message.author.id}`;
     const total = list.length;
-    const msg = await message.reply({ embeds: [new EmbedBuilder().setColor(0x5865F2).setTitle(`Removing ${role.name}...`).setDescription(`Progress: 0/${total}`).setFooter({ text: 'Use ?rrole cancel to stop' })] });
+    const msg = await message.reply({ embeds: [responseBuilder.buildResult({ title: `Removing ${role.name}...`, description: `Progress: 0/${total}`})] });
     pendingBatches.set(key, true);
 
     let processed = 0;
@@ -73,14 +73,14 @@ module.exports = {
       }
       if (i + batchSize < list.length) {
         try {
-          await msg.edit({ embeds: [new EmbedBuilder().setColor(0x5865F2).setTitle(`Removing ${role.name}...`).setDescription(`Progress: ${processed}/${total}`).setFooter({ text: 'Use ?rrole cancel to stop' })] });
+          await msg.edit({ embeds: [responseBuilder.buildResult({ title: `Removing ${role.name}...`, description: `Progress: ${processed}/${total}`})] });
         } catch { /* ignore edit fail */ }
       }
     }
     pendingBatches.delete(key);
     const cancelled = processed < total;
     try {
-      return await msg.edit({ embeds: [new EmbedBuilder().setColor(cancelled ? 0xFEE75C : 0x57F287).setTitle(cancelled ? `Cancelled` : `Done`).setDescription(`${cancelled ? '⚠️' : '✅'} Removed ${role.name} from ${processed}/${total} member(s).`)] });
+      return await msg.edit({ embeds: [responseBuilder.buildResult({ title: cancelled ? `Cancelled` : `Done`, description: `${cancelled ? '⚠️' : '✅'} Removed ${role.name} from ${processed}/${total} member(s).`})] });
     } catch { /* progress message deleted */ }
   },
 };

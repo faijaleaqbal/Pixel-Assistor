@@ -1,6 +1,6 @@
 // src/commands/upi/setupi.js
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 const config = require('../../utils/config');
 const { getDb } = require('../../utils/db');
 
@@ -12,12 +12,12 @@ module.exports = {
   usage: '<label> <upi-id>',
   cooldown: 3,
   args: true,
-  async execute(message, args) {
+  async execute(message, args, client) {
     const label = args[0];
     const upiId = args[1];
-    if (!label || !upiId) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`Usage: \`${config.prefix}setupi <label> <upi-id>\`\nExample: \`${config.prefix}setupi Mbk name@bank\``)] });
-    if (!/^[\w.\-]+@[\w.\-]+$/.test(upiId)) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('That doesn\'t look like a valid UPI ID (expected `name@bank`).')] });
+    if (!label || !upiId) return message.reply({ embeds: [responseBuilder.buildResult({ description: `Usage: \`${config.prefix}setupi <label> <upi-id>\`\nExample: \`${config.prefix}setupi Mbk name@bank\``})] });
+    if (!/^[\w.\-]+@[\w.\-]+$/.test(upiId)) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'That doesn\'t look like a valid UPI ID (expected `name@bank`).'})] });
     await getDb().upi.set(message.author.id, label, upiId);
-    return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Saved UPI \`${upiId}\` under label \`${label}\`.`)] });
+    return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Saved UPI \`${upiId}\` under label \`${label}\`.`})] });
   },
 };

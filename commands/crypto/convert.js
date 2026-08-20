@@ -24,7 +24,7 @@
 //   > <amount formatted> <BASE> = <result formatted> <TARGET>
 //   Footer: "Requested by <username>"
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 const config = require('../../utils/config');
 const { convert, isFiat } = require('../../utils/cryptoApi');
 
@@ -68,7 +68,7 @@ module.exports = {
   usage: '<amount> <base> <target>',
   cooldown: 5,
   args: true,
-  async execute(message, args) {
+  async execute(message, args, client) {
     // Detect missing amount — the spec calls for an EXACT error format.
     // We treat any non-numeric first arg as "amount missing" so "?convert usd inr"
     // triggers the friendly error rather than a generic usage dump.
@@ -87,14 +87,9 @@ module.exports = {
 
     if (amountMissing) {
       return message.reply({
-        embeds: [new EmbedBuilder()
-          .setColor(YELLOW)
-          .setDescription(
-            `⚠️ | You are missing the amount argument!\n` +
+        embeds: [responseBuilder.buildResult({ description: `⚠️ | You are missing the amount argument!\n` +
             `> Usage: \`${config.prefix}convert <amount> <base> <target>\`\n` +
-            `> Example: \`${config.prefix}convert 100 usd inr\``
-          )
-          .setTimestamp()]
+            `> Example: \`${config.prefix}convert 100 usd inr\``})]
       });
     }
 
@@ -104,20 +99,15 @@ module.exports = {
 
     if (!base || !target) {
       return message.reply({
-        embeds: [new EmbedBuilder()
-          .setColor(YELLOW)
-          .setDescription(
-            `⚠️ | You are missing the ${!base ? 'base' : 'target'} argument!\n` +
+        embeds: [responseBuilder.buildResult({ description: `⚠️ | You are missing the ${!base ? 'base' : 'target'} argument!\n` +
             `> Usage: \`${config.prefix}convert <amount> <base> <target>\`\n` +
-            `> Example: \`${config.prefix}convert 100 usd inr\``
-          )
-          .setTimestamp()]
+            `> Example: \`${config.prefix}convert 100 usd inr\``})]
       });
     }
 
     // Light acknowledgement while we fetch live rates.
     const m = await message.reply({
-      embeds: [new EmbedBuilder().setColor(PURPLE).setDescription('⏳ Fetching live rates…').setTimestamp()]
+      embeds: [responseBuilder.buildResult({ description: '⏳ Fetching live rates…'})]
     });
 
     try {
@@ -127,14 +117,7 @@ module.exports = {
       const resultStr = formatAmount(result, target);
 
       return m.edit({
-        embeds: [new EmbedBuilder()
-          .setColor(PURPLE)
-          .setTitle('💱 | Conversion Result')
-          .setDescription(
-            `> ${baseStr} ${base.toUpperCase()} = ${resultStr} ${target.toUpperCase()}`
-          )
-          .setFooter({ text: `Requested by ${message.author.username}` })
-          .setTimestamp()]
+        embeds: [responseBuilder.buildResult({ title: '💱 | Conversion Result', description: `> ${baseStr} ${base.toUpperCase()} = ${resultStr} ${target.toUpperCase()}`})]
       });
     } catch (e) {
       const msg = e?.message || 'Unknown error';
@@ -144,7 +127,7 @@ module.exports = {
       } else if (msg.includes('not supported')) {
         desc = `❌ ${msg}`;
       }
-      return m.edit({ embeds: [new EmbedBuilder().setColor(RED).setDescription(desc).setTimestamp()] });
+      return m.edit({ embeds: [responseBuilder.buildResult({ description: desc})] });
     }
   },
 };

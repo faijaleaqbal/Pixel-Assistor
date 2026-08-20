@@ -1,3 +1,4 @@
+const responseBuilder = require('../../utils/responseBuilder');
 // src/commands/upi/qr.js
 // Generate a UPI payment QR code.
 // Usage: ?qr [label-or-upi-id] [amount|flexible] [note...]
@@ -11,16 +12,12 @@
 //   ?qr john@paytm 250 For lunch           → raw UPI ID, amount 250, note "For lunch"
 //   ?qr john@paytm flexible                → raw UPI ID, no fixed amount
 
-const { EmbedBuilder, AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const { AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 const config = require('../../utils/config');
 const { getDb } = require('../../utils/db');
 const QRCode = require('qrcode');
 
-const USAGE_EMBED = (prefix) => new EmbedBuilder()
-  .setColor(0xED4245)
-  .setTitle('Please use the command in the proper format!')
-  .setDescription(
-    '```\n' +
+const USAGE_EMBED = (prefix) => responseBuilder.buildResult({ title: 'Please use the command in the proper format!', description: '```\n' +
     `${prefix}qr\n` +
     `${prefix}qr 500\n` +
     `${prefix}qr flexible\n` +
@@ -28,8 +25,7 @@ const USAGE_EMBED = (prefix) => new EmbedBuilder()
     `${prefix}qr Mbk Main flexible\n` +
     `${prefix}qr john@paytm 250 For lunch\n` +
     `${prefix}qr john@paytm flexible\n` +
-    '```'
-  );
+    '```'});
 
 /**
  * Parse the raw args array into { upiId, label, amount, note, isRawUpi, isFlexible }.
@@ -142,7 +138,7 @@ async function sendQrEmbed(message, upiId, displayName, amount, note, isFlexible
   try {
     png = await QRCode.toBuffer(upiLink, { width: 512, margin: 2, color: { dark: '#000000', light: '#ffffff' } });
   } catch (e) {
-    return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`QR generation failed: ${e.message}`)] });
+    return message.reply({ embeds: [responseBuilder.buildResult({ description: `QR generation failed: ${e.message}`})] });
   }
 
   const attachment = new AttachmentBuilder(png, { name: 'upi-qr.png' });
@@ -155,13 +151,7 @@ async function sendQrEmbed(message, upiId, displayName, amount, note, isFlexible
     descLines.push(`> Amount: ${amount.toFixed(2)}`);
   }
 
-  const embed = new EmbedBuilder()
-    .setColor(config.embedColor)
-    .setTitle('🧾 UPI Payment QR Code')
-    .setDescription(descLines.join('\n'))
-    .setImage('attachment://upi-qr.png')
-    .setFooter({ text: `Requested by ${message.author.username} • ${message.client.user.username} • ${new Date().toISOString()}` })
-    .setTimestamp();
+  const embed = responseBuilder.buildResult({ title: '🧾 UPI Payment QR Code', description: descLines.join('\n'), image: 'attachment://upi-qr.png'});
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -208,12 +198,7 @@ async function interactiveMode(message) {
       )
     );
 
-    const promptEmbed = new EmbedBuilder()
-      .setColor(config.embedColor)
-      .setTitle('🧾 UPI QR — Select a saved UPI')
-      .setDescription('Choose one of your saved UPI IDs below, or enter a UPI ID manually.')
-      .setFooter({ text: `Requested by ${message.author.username}` })
-      .setTimestamp();
+    const promptEmbed = responseBuilder.buildResult({ title: '🧾 UPI QR — Select a saved UPI', description: 'Choose one of your saved UPI IDs below, or enter a UPI ID manually.'});
 
     const promptMsg = await message.reply({ embeds: [promptEmbed], components: buttonRows });
 
@@ -230,10 +215,7 @@ async function interactiveMode(message) {
       let selectedUpiId;
       if (interaction.customId === 'qr_int_manual') {
         // Ask for UPI ID via follow-up message
-        const askEmbed = new EmbedBuilder()
-          .setColor(config.embedColor)
-          .setDescription('Please type your UPI ID (e.g. `name@bank`). You have 60 seconds.')
-          .setTimestamp();
+        const askEmbed = responseBuilder.buildResult({ description: 'Please type your UPI ID (e.g. `name@bank`). You have 60 seconds.'});
         await promptMsg.edit({ embeds: [askEmbed], components: [] });
 
         const msgCollector = message.channel.createMessageCollector({
@@ -245,7 +227,7 @@ async function interactiveMode(message) {
         msgCollector.on('collect', async (m) => {
           const rawUpi = m.content.trim();
           if (!rawUpi.includes('@')) {
-            return m.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('That doesn\'t look like a valid UPI ID. Cancelled.')] }).then((r) => setTimeout(() => r.delete().catch(() => {}), 5000));
+            return m.reply({ embeds: [responseBuilder.buildResult({ description: 'That doesn\'t look like a valid UPI ID. Cancelled.'})] }).then((r) => setTimeout(() => r.delete().catch(() => {}), 5000));
           }
           // Ask for amount
           await askAmountAndGenerate(message, promptMsg, rawUpi, message.author.username);
@@ -253,7 +235,7 @@ async function interactiveMode(message) {
 
         msgCollector.on('end', (collected, reason) => {
           if (reason === 'time' && collected.size === 0) {
-            promptMsg.edit({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('⏰ Timed out — UPI QR creation cancelled.')], components: [] }).catch(() => {});
+            promptMsg.edit({ embeds: [responseBuilder.buildResult({ description: '⏰ Timed out — UPI QR creation cancelled.'})], components: [] }).catch(() => {});
           }
         });
         return;
@@ -269,16 +251,12 @@ async function interactiveMode(message) {
 
     collector.on('end', (collected, reason) => {
       if (reason === 'time') {
-        promptMsg.edit({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('⏰ Timed out — UPI QR creation cancelled.')], components: [] }).catch(() => {});
+        promptMsg.edit({ embeds: [responseBuilder.buildResult({ description: '⏰ Timed out — UPI QR creation cancelled.'})], components: [] }).catch(() => {});
       }
     });
   } else {
     // No saved UPIs — ask for raw UPI ID
-    const askEmbed = new EmbedBuilder()
-      .setColor(config.embedColor)
-      .setTitle('🧾 UPI QR — Enter your UPI ID')
-      .setDescription('You have no saved UPI IDs. Please type your UPI ID (e.g. `name@bank`).\nYou have 60 seconds.')
-      .setTimestamp();
+    const askEmbed = responseBuilder.buildResult({ title: '🧾 UPI QR — Enter your UPI ID', description: 'You have no saved UPI IDs. Please type your UPI ID (e.g. `name@bank`).\nYou have 60 seconds.'});
 
     const promptMsg = await message.reply({ embeds: [askEmbed] });
 
@@ -291,14 +269,14 @@ async function interactiveMode(message) {
     msgCollector.on('collect', async (m) => {
       const rawUpi = m.content.trim();
       if (!rawUpi.includes('@')) {
-        return m.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('That doesn\'t look like a valid UPI ID. Cancelled.')] }).then((r) => setTimeout(() => r.delete().catch(() => {}), 5000));
+        return m.reply({ embeds: [responseBuilder.buildResult({ description: 'That doesn\'t look like a valid UPI ID. Cancelled.'})] }).then((r) => setTimeout(() => r.delete().catch(() => {}), 5000));
       }
       await askAmountAndGenerate(message, promptMsg, rawUpi, message.author.username);
     });
 
     msgCollector.on('end', (collected, reason) => {
       if (reason === 'time' && collected.size === 0) {
-        promptMsg.edit({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('⏰ Timed out — UPI QR creation cancelled.')], components: [] }).catch(() => {});
+        promptMsg.edit({ embeds: [responseBuilder.buildResult({ description: '⏰ Timed out — UPI QR creation cancelled.'})], components: [] }).catch(() => {});
       }
     });
   }
@@ -319,10 +297,7 @@ async function askAmountAndGenerate(message, promptMsg, upiId, displayName) {
       .setStyle(ButtonStyle.Primary)
   );
 
-  const askEmbed = new EmbedBuilder()
-    .setColor(config.embedColor)
-    .setDescription(`UPI ID: \`${upiId}\`\nWould you like a fixed amount or flexible?`)
-    .setTimestamp();
+  const askEmbed = responseBuilder.buildResult({ description: `UPI ID: \`${upiId}\`\nWould you like a fixed amount or flexible?`});
 
   await promptMsg.edit({ embeds: [askEmbed], components: [amountRow] });
 
@@ -341,10 +316,7 @@ async function askAmountAndGenerate(message, promptMsg, upiId, displayName) {
       await askNoteAndGenerate(message, promptMsg, upiId, displayName, null, true);
     } else {
       // Ask for amount via text
-      const amtEmbed = new EmbedBuilder()
-        .setColor(config.embedColor)
-        .setDescription('Please type the amount (e.g. `500`). You have 60 seconds.')
-        .setTimestamp();
+      const amtEmbed = responseBuilder.buildResult({ description: 'Please type the amount (e.g. `500`). You have 60 seconds.'});
       await promptMsg.edit({ embeds: [amtEmbed], components: [] });
 
       const msgCollector = message.channel.createMessageCollector({
@@ -356,14 +328,14 @@ async function askAmountAndGenerate(message, promptMsg, upiId, displayName) {
       msgCollector.on('collect', async (m) => {
         const val = parseFloat(m.content.trim());
         if (isNaN(val) || val <= 0) {
-          return m.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Invalid amount. Must be a positive number. Cancelled.')] }).then((r) => setTimeout(() => r.delete().catch(() => {}), 5000));
+          return m.reply({ embeds: [responseBuilder.buildResult({ description: 'Invalid amount. Must be a positive number. Cancelled.'})] }).then((r) => setTimeout(() => r.delete().catch(() => {}), 5000));
         }
         await askNoteAndGenerate(message, promptMsg, upiId, displayName, val, false);
       });
 
       msgCollector.on('end', (collected, reason) => {
         if (reason === 'time' && collected.size === 0) {
-          promptMsg.edit({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('⏰ Timed out — UPI QR creation cancelled.')], components: [] }).catch(() => {});
+          promptMsg.edit({ embeds: [responseBuilder.buildResult({ description: '⏰ Timed out — UPI QR creation cancelled.'})], components: [] }).catch(() => {});
         }
       });
     }
@@ -371,7 +343,7 @@ async function askAmountAndGenerate(message, promptMsg, upiId, displayName) {
 
   collector.on('end', (collected, reason) => {
     if (reason === 'time') {
-      promptMsg.edit({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('⏰ Timed out — UPI QR creation cancelled.')], components: [] }).catch(() => {});
+      promptMsg.edit({ embeds: [responseBuilder.buildResult({ description: '⏰ Timed out — UPI QR creation cancelled.'})], components: [] }).catch(() => {});
     }
   });
 }
@@ -387,10 +359,7 @@ async function askNoteAndGenerate(message, promptMsg, upiId, displayName, amount
       .setStyle(ButtonStyle.Secondary)
   );
 
-  const noteEmbed = new EmbedBuilder()
-    .setColor(config.embedColor)
-    .setDescription('Type a payment note (or click **Skip Note** to continue without one). You have 60 seconds.')
-    .setTimestamp();
+  const noteEmbed = responseBuilder.buildResult({ description: 'Type a payment note (or click **Skip Note** to continue without one). You have 60 seconds.'});
 
   await promptMsg.edit({ embeds: [noteEmbed], components: [skipRow] });
 
@@ -432,7 +401,7 @@ async function askNoteAndGenerate(message, promptMsg, upiId, displayName, amount
   const onEnd = () => {
     if (!handled) {
       handled = true;
-      promptMsg.edit({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('⏰ Timed out — UPI QR creation cancelled.')], components: [] }).catch(() => {});
+      promptMsg.edit({ embeds: [responseBuilder.buildResult({ description: '⏰ Timed out — UPI QR creation cancelled.'})], components: [] }).catch(() => {});
     }
   };
   btnCollector.on('end', (_, reason) => { if (reason === 'time') onEnd(); });
@@ -449,7 +418,7 @@ module.exports = {
   usage: '[label-or-upi-id] [amount|flexible] [note...]',
   cooldown: 5,
   args: false,  // Changed: args are now optional (interactive mode)
-  async execute(message, args) {
+  async execute(message, args, client) {
     const parsed = parseArgs(args);
 
     // ── Interactive mode ──
@@ -465,7 +434,7 @@ module.exports = {
     if (parsed.mode === 'label_default') {
       const rows = await getDb().upi.list(message.author.id);
       if (!rows.length) {
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`You have no saved UPI IDs. Use \`${config.prefix}setupi <label> <upi-id>\` to save one first, or provide a UPI ID directly like \`${config.prefix}qr user@bank 500\`.`)] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: `You have no saved UPI IDs. Use \`${config.prefix}setupi <label> <upi-id>\` to save one first, or provide a UPI ID directly like \`${config.prefix}qr user@bank 500\`.`})] });
       }
       // Use the first saved UPI as default
       const defaultEntry = rows[0];
@@ -474,7 +443,7 @@ module.exports = {
 
     // ── ?qr user@bank (raw UPI, no amount) → interactive for amount ──
     if (parsed.mode === 'raw_no_amount') {
-      return askAmountAndGenerate(message, await message.reply({ embeds: [new EmbedBuilder().setColor(config.embedColor).setDescription(`UPI ID: \`${parsed.upiId}\`\nNow let\'s set the amount...`)], fetchReply: true }), parsed.upiId, message.author.username);
+      return askAmountAndGenerate(message, await message.reply({ embeds: [responseBuilder.buildResult({ description: `UPI ID: \`${parsed.upiId}\`\nNow let\'s set the amount...`})], fetchReply: true }), parsed.upiId, message.author.username);
     }
 
     // ── ?qr user@bank 250 For lunch (raw UPI, ready) ──
@@ -487,7 +456,7 @@ module.exports = {
       const rows = await getDb().upi.list(message.author.id);
       const found = rows.find((r) => r.label.toLowerCase() === parsed.label.toLowerCase());
       if (!found) {
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`No saved UPI under label \`${parsed.label}\`. Run \`${config.prefix}listupi\` to see your labels.`)] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: `No saved UPI under label \`${parsed.label}\`. Run \`${config.prefix}listupi\` to see your labels.`})] });
       }
       return sendQrEmbed(message, found.upiId, message.author.username, parsed.amount, parsed.note, parsed.isFlexible);
     }
@@ -497,9 +466,9 @@ module.exports = {
       const rows = await getDb().upi.list(message.author.id);
       const found = rows.find((r) => r.label.toLowerCase() === parsed.label.toLowerCase());
       if (!found) {
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`No saved UPI under label \`${parsed.label}\`. Run \`${config.prefix}listupi\` to see your labels.`)] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: `No saved UPI under label \`${parsed.label}\`. Run \`${config.prefix}listupi\` to see your labels.`})] });
       }
-      return askAmountAndGenerate(message, await message.reply({ embeds: [new EmbedBuilder().setColor(config.embedColor).setDescription(`UPI ID: \`${found.upiId}\` (label: \`${parsed.label}\`)\nNow let\'s set the amount...`)], fetchReply: true }), found.upiId, message.author.username);
+      return askAmountAndGenerate(message, await message.reply({ embeds: [responseBuilder.buildResult({ description: `UPI ID: \`${found.upiId}\` (label: \`${parsed.label}\`)\nNow let\'s set the amount...`})], fetchReply: true }), found.upiId, message.author.username);
     }
 
     // Fallback: invalid format

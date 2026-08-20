@@ -1,7 +1,7 @@
 // src/commands/utility/ping.js
 // Check bot latency — WebSocket heartbeat + round-trip API ping.
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 
 module.exports = {
   name: 'ping',
@@ -16,14 +16,8 @@ module.exports = {
     const sent = await message.reply('🏓 Pinging...');
     const apiLatency = sent.createdTimestamp - message.createdTimestamp;
 
-    const embed = new EmbedBuilder()
-      .setColor(0x57F287)
-      .setTitle('🏓 Pong!')
-      .addFields(
-        { name: 'WebSocket Heartbeat', value: `\`${wsLatency}ms\``, inline: true },
-        { name: 'API Roundtrip', value: `\`${apiLatency}ms\``, inline: true },
-      )
-      .setTimestamp();
+    const embed = responseBuilder.buildResult({ title: '🏓 Pong!', fields: [{ name: 'WebSocket Heartbeat', value: `\`${wsLatency}ms\``, inline: true },
+        { name: 'API Roundtrip', value: `\`${apiLatency}ms\``, inline: true },]});
 
     return sent.edit({ content: null, embeds: [embed] });
   },
@@ -32,14 +26,8 @@ module.exports = {
     const sent = await interaction.reply({ content: '🏓 Pinging...', fetchReply: true });
     const apiLatency = sent.createdTimestamp - interaction.createdTimestamp;
 
-    const embed = new EmbedBuilder()
-      .setColor(0x57F287)
-      .setTitle('🏓 Pong!')
-      .addFields(
-        { name: 'WebSocket Heartbeat', value: `\`${wsLatency}ms\``, inline: true },
-        { name: 'API Roundtrip', value: `\`${apiLatency}ms\``, inline: true },
-      )
-      .setTimestamp();
+    const embed = responseBuilder.buildResult({ title: '🏓 Pong!', fields: [{ name: 'WebSocket Heartbeat', value: `\`${wsLatency}ms\``, inline: true },
+        { name: 'API Roundtrip', value: `\`${apiLatency}ms\``, inline: true },]});
 
     return interaction.editReply({ content: null, embeds: [embed] });
   },

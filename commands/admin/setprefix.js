@@ -1,5 +1,5 @@
 // src/commands/admin/setprefix.js
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 const config = require('../../utils/config');
 const { getDb } = require('../../utils/db');
 const { setPrefix } = require('../../utils/prefixCache');
@@ -14,9 +14,9 @@ module.exports = {
   cooldown: 5,
   permissions: ['Administrator'],
   args: true,
-  async execute(message, args) {
+  async execute(message, args, client) {
     if (!hasPermission(message.member, 'Administrator') && !isOwner(message.author.id) && message.guild.ownerId !== message.author.id) {
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('You need the `Administrator` permission to change the server prefix.')] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: 'You need the `Administrator` permission to change the server prefix.'})] });
     }
 
     const input = args[0];
@@ -24,7 +24,7 @@ module.exports = {
     const targetPrefix = isReset ? (config.prefix || '?') : input;
 
     if (!isReset && (targetPrefix.length < 1 || targetPrefix.length > 5)) {
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Prefix must be between 1 and 5 characters.')] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: 'Prefix must be between 1 and 5 characters.'})] });
     }
 
     try {
@@ -33,14 +33,10 @@ module.exports = {
       setPrefix(message.guild.id, targetPrefix);
 
       return message.reply({
-        embeds: [new EmbedBuilder()
-          .setColor(0x57F287)
-          .setTitle('✅ Prefix Updated')
-          .setDescription(`The server prefix is now set to \`${targetPrefix}\`.\nExample: \`${targetPrefix}help\``)
-          .setTimestamp()]
+        embeds: [responseBuilder.buildResult({ title: '✅ Prefix Updated', description: `The server prefix is now set to \`${targetPrefix}\`.\nExample: \`${targetPrefix}help\``})]
       });
     } catch (e) {
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`Failed to update prefix: ${e.message}`)] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: `Failed to update prefix: ${e.message}`})] });
     }
   },
 };

@@ -1,8 +1,8 @@
+const responseBuilder = require('../../utils/responseBuilder');
 // src/commands/utility/botinfo.js
 // Detailed bot statistics.
 
-const { EmbedBuilder, version: djsVersion } = require('discord.js');
-const config = require('../../utils/config');
+const { version: djsVersion } = require('discord.js');
 
 module.exports = {
   name: 'botinfo',
@@ -22,12 +22,7 @@ module.exports = {
     let channels = 0;
     client.guilds.cache.forEach((g) => (channels += g.channels.cache.size));
 
-    const embed = new EmbedBuilder()
-      .setColor(config.embedColor)
-      .setTitle(`📊 ${client.user.username} Stats`)
-      .setThumbnail(client.user.displayAvatarURL({ size: 512 }))
-      .addFields(
-        { name: 'Servers', value: String(client.guilds.cache.size), inline: true },
+    const embed = responseBuilder.buildResult({ title: `📊 ${client.user.username} Stats`, fields: [{ name: 'Servers', value: String(client.guilds.cache.size), inline: true },
         { name: 'Channels', value: String(channels), inline: true },
         { name: 'Users', value: String(client.users.cache.size), inline: true },
         { name: 'Ping (WS)', value: `${Math.round(client.ws.ping)}ms`, inline: true },
@@ -35,9 +30,7 @@ module.exports = {
         { name: 'Memory (RSS)', value: `${(mem.rss / 1024 / 1024).toFixed(2)} MB`, inline: true },
         { name: 'Commands', value: String(client.commands.size), inline: true },
         { name: 'discord.js', value: `v${djsVersion}`, inline: true },
-        { name: 'Node.js', value: process.version, inline: true },
-      )
-      .setTimestamp();
+        { name: 'Node.js', value: process.version, inline: true },], thumbnail: client.user.displayAvatarURL({ size: 512 })});
 
     return message.reply({ embeds: [embed] });
   },

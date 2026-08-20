@@ -1,7 +1,7 @@
 // src/commands/crypto/price.js
 // Look up the live price of a coin via CoinGecko.
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 const config = require('../../utils/config');
 const { getPrice, searchCoin } = require('../../utils/cryptoApi');
 
@@ -24,11 +24,11 @@ module.exports = {
       required: true,
     },
   ],
-  async execute(message, args) {
+  async execute(message, args, client) {
     const q = (args.join(' ') || '').toLowerCase().trim();
-    if (!q) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`Usage: \`${config.prefix}price <coin>\``)] });
+    if (!q) return message.reply({ embeds: [responseBuilder.buildResult({ description: `Usage: \`${config.prefix}price <coin>\``})] });
 
-    const m = await message.reply({ embeds: [new EmbedBuilder().setColor(config.embedColor).setDescription('⏳ Fetching price…')] });
+    const m = await message.reply({ embeds: [responseBuilder.buildResult({ description: '⏳ Fetching price…'})] });
     const embed = await renderPriceEmbed(q, config.prefix);
     return m.edit({ embeds: [embed] });
   },
@@ -51,15 +51,11 @@ async function renderPriceEmbed(q, prefix = '?') {
 
     if (!data) {
       if (!q || !q.trim()) {
-        return new EmbedBuilder().setColor(0xED4245)
-          .setTitle('❌ Coin not found')
-          .setDescription(`No results for **""** on CoinGecko.\n\nTry: \`${prefix}price bitcoin\`, \`${prefix}price eth\`, \`${prefix}price sol\``);
+        return responseBuilder.buildResult({ title: '❌ Coin not found', description: `No results for **""** on CoinGecko.\n\nTry: \`${prefix}price bitcoin\`, \`${prefix}price eth\`, \`${prefix}price sol\``});
       }
       const results = await searchCoin(q);
       if (!results.length) {
-        return new EmbedBuilder().setColor(0xED4245)
-          .setTitle('❌ Coin not found')
-          .setDescription(`No results for **"${q}"** on CoinGecko.\n\nTry: \`${prefix}price bitcoin\`, \`${prefix}price eth\`, \`${prefix}price sol\``);
+        return responseBuilder.buildResult({ title: '❌ Coin not found', description: `No results for **"${q}"** on CoinGecko.\n\nTry: \`${prefix}price bitcoin\`, \`${prefix}price eth\`, \`${prefix}price sol\``});
       }
       coinId = results[0].id;
       coinName = results[0].name || coinId;
@@ -91,12 +87,7 @@ async function renderPriceEmbed(q, prefix = '?') {
       embedFields.push({ name: 'PKR', value: `₨${(data.pkr || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, inline: true });
     }
 
-    const priceEmbed = new EmbedBuilder()
-      .setColor(color)
-      .setTitle(`💰 ${coinName}`)
-      .addFields(...embedFields)
-      .setFooter({ text: 'CoinGecko • Prices are live' })
-      .setTimestamp();
+    const priceEmbed = responseBuilder.buildResult({ title: `💰 ${coinName}`, fields: [...embedFields]});
     if (thumbnailUrl) priceEmbed.setThumbnail(thumbnailUrl);
 
     return priceEmbed;
@@ -110,6 +101,6 @@ async function renderPriceEmbed(q, prefix = '?') {
     } else {
       desc = `Price lookup failed: **${msg}**`;
     }
-    return new EmbedBuilder().setColor(0xED4245).setDescription(desc);
+    return responseBuilder.buildResult({ description: desc});
   }
 }

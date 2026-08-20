@@ -1,6 +1,6 @@
 // src/commands/moderation/unbanall.js
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 
 module.exports = {
   name: 'unbanall',
@@ -14,9 +14,9 @@ module.exports = {
     try {
       bans = await message.guild.bans.fetch();
     } catch (e) {
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`Failed to fetch bans: **${e.message}**`)] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: `Failed to fetch bans: **${e.message}**`})] });
     }
-    if (!bans.size) return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('No banned users found.')] });
+    if (!bans.size) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'No banned users found.'})] });
     let count = 0;
     for (const [id] of bans) {
       try {
@@ -24,6 +24,6 @@ module.exports = {
         count++;
       } catch { /* skip */ }
     }
-    return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Unbanned ${count}/${bans.size} user(s).`)] });
+    return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Unbanned ${count}/${bans.size} user(s).`})] });
   },
 };

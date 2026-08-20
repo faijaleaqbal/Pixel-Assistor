@@ -1,7 +1,7 @@
 // src/commands/moderation/channelremove.js
 // Delete a channel. Usage: channelremove [#channel]
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 const { checkBotPermissions } = require('../../utils/perms');
 
 module.exports = {
@@ -17,21 +17,21 @@ module.exports = {
 
     const botCheck = checkBotPermissions(message, ['ManageChannels']);
     if (!botCheck.ok) {
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('❌ I do not have **ManageChannels** permission.')] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: '❌ I do not have **ManageChannels** permission.'})] });
     }
 
     if (message.guild.rulesChannelId === ch.id || message.guild.publicUpdatesChannelId === ch.id || message.guild.systemChannelId === ch.id) {
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('❌ Cannot delete server system or rules channel.')] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: '❌ Cannot delete server system or rules channel.'})] });
     }
 
     if (!ch.deletable) {
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('❌ I cannot delete this channel.')] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: '❌ I cannot delete this channel.'})] });
     }
 
     try {
       await ch.delete(`Deleted by ${message.author.tag}`);
     } catch (e) {
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`Failed to delete channel: ${e.message}`)] }).catch(() => {});
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: `Failed to delete channel: ${e.message}`})] }).catch(() => {});
     }
   },
 };

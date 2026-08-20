@@ -4,8 +4,7 @@
 //   ?banner user <@user|userID>   -> user's banner
 //   ?banner server    -> server banner
 
-const { EmbedBuilder } = require('discord.js');
-const config = require('../../utils/config');
+const responseBuilder = require('../../utils/responseBuilder');
 const { resolveUserArg } = require('../../utils/resolveUser');
 
 module.exports = {
@@ -15,14 +14,14 @@ module.exports = {
   description: "Show a user's or server's banner. Accepts @user or raw userID.",
   usage: '[@user|userID | server]',
   cooldown: 3,
-  async execute(message, args) {
+  async execute(message, args, client) {
     const sub = (args[0] || '').toLowerCase();
 
     // ?banner server
     if (sub === 'server') {
       const banner = message.guild.bannerURL({ size: 1024, extension: 'png' });
-      if (!banner) return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('This server has no banner.')] });
-      return message.reply({ embeds: [new EmbedBuilder().setColor(config.embedColor).setTitle(`\uD83C\uDFE0 ${message.guild.name}'s banner`).setImage(banner).setTimestamp()] });
+      if (!banner) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'This server has no banner.'})] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ title: `\uD83C\uDFE0 ${message.guild.name}'s banner`, image: banner})] });
     }
 
     // ?banner user <@user|userID>  OR  ?banner <@user|userID>  OR  ?banner (self)
@@ -37,10 +36,10 @@ module.exports = {
     try {
       u = await message.client.users.fetch(target.id, { force: true });
     } catch (e) {
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`Failed to fetch user: ${e.message}`)] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: `Failed to fetch user: ${e.message}`})] });
     }
     const banner = u.bannerURL({ size: 4096, extension: 'png' });
-    if (!banner) return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription(`${target.tag} has no banner.`)] });
-    return message.reply({ embeds: [new EmbedBuilder().setColor(config.embedColor).setTitle(`\uD83D\uDDBC\uFE0F ${target.tag}'s banner`).setImage(banner).setTimestamp()] });
+    if (!banner) return message.reply({ embeds: [responseBuilder.buildResult({ description: `${target.tag} has no banner.`})] });
+    return message.reply({ embeds: [responseBuilder.buildResult({ title: `\uD83D\uDDBC\uFE0F ${target.tag}'s banner`, image: banner})] });
   },
 };

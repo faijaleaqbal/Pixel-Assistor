@@ -1,5 +1,6 @@
+const responseBuilder = require('../../utils/responseBuilder');
 // src/commands/utility/ticket.js
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits, ComponentType } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits, ComponentType } = require('discord.js');
 
 module.exports = {
   name: 'ticket',
@@ -8,13 +9,9 @@ module.exports = {
   usage: '[topic]',
   cooldown: 10,
   permissions: ['ManageChannels'],
-  async execute(message, args) {
+  async execute(message, args, client) {
     const topic = args.join(' ') || 'Support';
-    const embed = new EmbedBuilder()
-      .setColor(0x5865F2)
-      .setTitle(`\uD83C\uDFAB ${topic}`)
-      .setDescription('Click the button below to open a ticket.')
-      .setFooter({ text: 'Ticket System' }).setTimestamp();
+    const embed = responseBuilder.buildResult({ title: `\uD83C\uDFAB ${topic}`, description: 'Click the button below to open a ticket.'});
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('ticket_create').setLabel('Open Ticket').setStyle(ButtonStyle.Primary).setEmoji('\uD83C\uDFAB')
@@ -56,10 +53,7 @@ module.exports = {
         return i.editReply({ content: `Failed to create ticket channel: ${createErr.message}` });
       }
 
-      const ticketEmbed = new EmbedBuilder()
-        .setColor(0x5865F2).setTitle(`\uD83C\uDFAB Ticket — ${topic}`)
-        .setDescription(`<@${i.user.id}>'s ticket.\nStaff will assist shortly.`)
-        .setTimestamp();
+      const ticketEmbed = responseBuilder.buildResult({ title: `\uD83C\uDFAB Ticket — ${topic}`, description: `<@${i.user.id}>'s ticket.\nStaff will assist shortly.`});
 
       const closeRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('ticket_close').setLabel('Close').setStyle(ButtonStyle.Danger)

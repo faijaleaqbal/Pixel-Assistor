@@ -1,8 +1,7 @@
 // src/commands/utility/servericon.js
 // Show the server's icon.
 
-const { EmbedBuilder } = require('discord.js');
-const config = require('../../utils/config');
+const responseBuilder = require('../../utils/responseBuilder');
 
 module.exports = {
   name: 'servericon',
@@ -16,18 +15,10 @@ module.exports = {
     const icon = guild.iconURL({ size: 4096, extension: 'png' });
 
     if (!icon) {
-      return message.reply({ embeds: [new EmbedBuilder()
-        .setColor(0xFEE75C)
-        .setTitle(`🏠 ${guild.name}`)
-        .setDescription('This server has no icon.')
-        .setTimestamp()] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ title: `🏠 ${guild.name}`, description: 'This server has no icon.'})] });
     }
 
-    const embed = new EmbedBuilder()
-      .setColor(config.embedColor)
-      .setTitle(`🏠 ${guild.name}`)
-      .setImage(icon)
-      .setTimestamp();
+    const embed = responseBuilder.buildResult({ title: `🏠 ${guild.name}`, image: icon});
 
     return message.reply({ embeds: [embed] });
   },

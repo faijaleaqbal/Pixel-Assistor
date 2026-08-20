@@ -7,7 +7,7 @@
 //
 // Permissions: ManageMessages (staff-only).
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 const discordTranscripts = require('discord-html-transcripts');
 const { sendTempReply } = require('../../utils/tempReply');
 
@@ -19,7 +19,7 @@ module.exports = {
   usage: '[count]',
   cooldown: 5,
   permissions: ['ManageMessages'],
-  async execute(message, args) {
+  async execute(message, args, client) {
     // ── 1. Parse optional message count ──
     let count = 100;
     const raw = (args[0] || '').trim();
@@ -35,17 +35,13 @@ module.exports = {
       messages = await message.channel.messages.fetch({ limit: count });
     } catch (e) {
       return sendTempReply(message, {
-        embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(
-          `Failed to fetch messages: ${e.message}`
-        )],
+        embeds: [responseBuilder.buildResult({ description: `Failed to fetch messages: ${e.message}`})],
       });
     }
 
     if (!messages || !messages.size) {
       return sendTempReply(message, {
-        embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription(
-          'No messages found in this channel.'
-        )],
+        embeds: [responseBuilder.buildResult({ description: 'No messages found in this channel.'})],
       });
     }
 
@@ -60,23 +56,15 @@ module.exports = {
       });
     } catch (e) {
       return sendTempReply(message, {
-        embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(
-          `Failed to generate transcript: ${e.message}`
-        )],
+        embeds: [responseBuilder.buildResult({ description: `Failed to generate transcript: ${e.message}`})],
       });
     }
 
     // ── 4. DM the file to the command author ──
     try {
-      const dmEmbed = new EmbedBuilder()
-        .setColor(0x5865F2)
-        .setTitle('📄 Channel Transcript')
-        .addFields(
-          { name: 'Server', value: message.guild.name, inline: true },
+      const dmEmbed = responseBuilder.buildResult({ title: '📄 Channel Transcript', fields: [{ name: 'Server', value: message.guild.name, inline: true },
           { name: 'Channel', value: `#${message.channel.name || message.channelId}`, inline: true },
-          { name: 'Messages', value: `${sorted.size}`, inline: true },
-        )
-        .setTimestamp();
+          { name: 'Messages', value: `${sorted.size}`, inline: true },]});
 
       await message.author.send({
         embeds: [dmEmbed],
@@ -88,16 +76,12 @@ module.exports = {
 
       // Success — auto-deleting confirmation in channel
       return sendTempReply(message, {
-        embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(
-          '✅ Transcript sent to your DMs.'
-        )],
+        embeds: [responseBuilder.buildResult({ description: '✅ Transcript sent to your DMs.'})],
       });
     } catch {
       // DMs likely closed
       return sendTempReply(message, {
-        embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(
-          "❌ Couldn't DM you the transcript — please enable DMs from server members and try again."
-        )],
+        embeds: [responseBuilder.buildResult({ description: "❌ Couldn't DM you the transcript — please enable DMs from server members and try again."})],
       });
     }
   },

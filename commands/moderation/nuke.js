@@ -1,7 +1,7 @@
 // src/commands/moderation/nuke.js
 // Clone current channel with same settings, delete original.
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 const { checkBotPermissions } = require('../../utils/perms');
 
 module.exports = {
@@ -19,20 +19,20 @@ module.exports = {
     const botCheck = checkBotPermissions(message, ['ManageChannels']);
     if (!botCheck.ok) {
       return message.reply({
-        embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('❌ I need the **ManageChannels** permission in this channel to nuke it.')],
+        embeds: [responseBuilder.buildResult({ description: '❌ I need the **ManageChannels** permission in this channel to nuke it.'})],
       });
     }
 
     // Guard essential community channels
     if (message.guild.rulesChannelId === old.id || message.guild.publicUpdatesChannelId === old.id || message.guild.systemChannelId === old.id) {
       return message.reply({
-        embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('❌ Cannot nuke server system, rules, or community updates channels.')],
+        embeds: [responseBuilder.buildResult({ description: '❌ Cannot nuke server system, rules, or community updates channels.'})],
       });
     }
 
     if (!old.deletable) {
       return message.reply({
-        embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('❌ This channel is not deletable by the bot.')],
+        embeds: [responseBuilder.buildResult({ description: '❌ This channel is not deletable by the bot.'})],
       });
     }
 
@@ -40,9 +40,9 @@ module.exports = {
       const pos = old.rawPosition;
       const created = await old.clone({ position: pos });
       await old.delete(`Nuked by ${message.author.tag}`);
-      return created.send({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`💥 Channel nuked by ${message.author}.`)] }).catch(() => {});
+      return created.send({ embeds: [responseBuilder.buildResult({ description: `💥 Channel nuked by ${message.author}.`})] }).catch(() => {});
     } catch (e) {
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`❌ Nuke failed: **${e.message}**`)] }).catch(() => {});
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: `❌ Nuke failed: **${e.message}**`})] }).catch(() => {});
     }
   },
 };

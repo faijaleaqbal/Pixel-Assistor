@@ -1,6 +1,6 @@
 // src/commands/moderation/addsticker.js
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 
 module.exports = {
   name: 'addsticker',
@@ -10,7 +10,7 @@ module.exports = {
   cooldown: 3,
   permissions: ['ManageEmojisAndStickers'],
   args: true,
-  async execute(message, args) {
+  async execute(message, args, client) {
     const name = args[0];
     const url = args[1];
     if (!name || !url) return message.reply('Usage: `addsticker <name> <url> [description]`');
@@ -21,9 +21,9 @@ module.exports = {
       // We default to ✨ if the description is multi-char / not an emoji.
       const tags = /^(\p{Extended_Pictographic}|\p{Emoji})$/u.test(description) ? description : '✨';
       const sticker = await message.guild.stickers.create({ name, file: url, tags, description });
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Sticker added: **${sticker.name}** (\`${sticker.id}\`)`)] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Sticker added: **${sticker.name}** (\`${sticker.id}\`)`})] });
     } catch (err) {
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`Failed to add sticker: ${err.message}`)] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: `Failed to add sticker: ${err.message}`})] });
     }
   },
 };

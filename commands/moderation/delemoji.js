@@ -1,6 +1,6 @@
 // src/commands/moderation/delemoji.js
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 
 module.exports = {
   name: 'delemoji',
@@ -11,12 +11,12 @@ module.exports = {
   cooldown: 3,
   permissions: ['ManageEmojisAndStickers'],
   args: true,
-  async execute(message, args) {
+  async execute(message, args, client) {
     const match = args[0].match(/<a?:\w+:(\d+)>/);
     if (!match) return message.reply('Provide a custom emoji.');
     const emoji = await message.guild.emojis.fetch(match[1]).catch(() => null);
     if (!emoji) return message.reply('Emoji not found in this guild.');
     await emoji.delete();
-    return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`🗑️ Deleted emoji \`${emoji.name}\`.`)] });
+    return message.reply({ embeds: [responseBuilder.buildResult({ description: `🗑️ Deleted emoji \`${emoji.name}\`.`})] });
   },
 };

@@ -1,8 +1,7 @@
 // src/commands/extra/top.js
 // Leaderboard / top stats — reaction wins and RPS wins.
 
-const { EmbedBuilder } = require('discord.js');
-const config = require('../../utils/config');
+const responseBuilder = require('../../utils/responseBuilder');
 const { getDb } = require('../../utils/db');
 
 module.exports = {
@@ -11,7 +10,7 @@ module.exports = {
   description: 'Leaderboard for reaction and RPS games.',
   usage: '[reaction|rps]',
   cooldown: 5,
-  async execute(message, args) {
+  async execute(message, args, client) {
     const type = (args[0] || 'reaction').toLowerCase();
     const db = getDb();
     const guildId = message.guild.id;
@@ -27,13 +26,13 @@ module.exports = {
       title = '⚡ Reaction Top 10';
       valueFn = (r) => `${r.wins} wins`;
     }
-    if (!rows.length) return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('No data yet — play a few rounds first.')] });
+    if (!rows.length) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'No data yet — play a few rounds first.'})] });
 
     const fields = rows.map((r, i) => ({
       name: `#${i + 1} — <@${r.userId}>`,
       value: valueFn(r),
       inline: false,
     }));
-    return message.reply({ embeds: [new EmbedBuilder().setColor(config.embedColor).setTitle(title).addFields(fields).setTimestamp()], allowedMentions: { parse: [] } });
+    return message.reply({ embeds: [responseBuilder.buildResult({ title: title, fields: [fields]})], allowedMentions: { parse: [] } });
   },
 };

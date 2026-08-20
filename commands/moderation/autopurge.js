@@ -2,7 +2,7 @@
 // Toggle an auto-purge loop on a channel: every N seconds, delete messages older than M.
 // Stored in-memory; restarts on bot restart.
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 const logger = require('../../utils/logger');
 
 const loops = new Map(); // channelId -> intervalId
@@ -16,12 +16,12 @@ module.exports = {
   cooldown: 5,
   permissions: ['ManageMessages', 'ManageGuild'],
   args: true,
-  async execute(message, args) {
+  async execute(message, args, client) {
     const mode = (args[0] || '').toLowerCase();
     if (mode === 'off') {
       const id = loops.get(message.channelId);
       if (id) { clearInterval(id); loops.delete(message.channelId); }
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription('Auto-purge stopped for this channel.')] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: 'Auto-purge stopped for this channel.'})] });
     }
     if (mode !== 'on') return message.reply('Usage: `autopurge on <maxAgeSeconds> [intervalSeconds]` or `autopurge off`.');
     const maxAge = parseInt(args[1], 10);
@@ -37,6 +37,6 @@ module.exports = {
       } catch (e) { logger.debug(`autopurge ${message.channelId}: ${e.message}`); }
     }, interval * 1000);
     loops.set(message.channelId, id);
-    return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Auto-purge ON — messages older than ${maxAge}s removed every ${interval}s.`)] });
+    return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Auto-purge ON — messages older than ${maxAge}s removed every ${interval}s.`})] });
   },
 };

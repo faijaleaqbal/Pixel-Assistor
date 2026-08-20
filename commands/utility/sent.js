@@ -25,7 +25,7 @@
 //
 // Permissions: existing ManageMessages check (kept for all three forms).
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 const { getDb } = require('../../utils/db');
 const ms = require('../../utils/ms');
 const { sendTempReply } = require('../../utils/tempReply');
@@ -42,7 +42,7 @@ module.exports = {
   permissions: ['ManageMessages'],
   args: true,
 
-  async execute(message, args) {
+  async execute(message, args, client) {
     if (!args.length) {
       return usageError(message, 'Missing message content to send.');
     }
@@ -85,18 +85,14 @@ module.exports = {
     const botPerms = targetChannel.permissionsFor(message.guild.members.me);
     if (!botPerms || !botPerms.has('SendMessages')) {
       return message.reply({ embeds: [
-        new EmbedBuilder().setColor(0xED4245).setDescription(
-          `I don't have **SendMessages** permission in ${targetChannel}.`
-        ),
+        responseBuilder.buildResult({ description: `I don't have **SendMessages** permission in ${targetChannel}.`}),
       ] });
     }
 
     const hasAttachment = message.attachments.size > 0;
     if (hasAttachment && !botPerms.has('AttachFiles')) {
       return message.reply({ embeds: [
-        new EmbedBuilder().setColor(0xED4245).setDescription(
-          `I don't have **AttachFiles** permission in ${targetChannel} (your message has an attachment).`
-        ),
+        responseBuilder.buildResult({ description: `I don't have **AttachFiles** permission in ${targetChannel} (your message has an attachment).`}),
       ] });
     }
 
@@ -111,16 +107,11 @@ module.exports = {
         }
         await targetChannel.send(sendOpts);
         return sendTempReply(message, { embeds: [
-          new EmbedBuilder()
-            .setColor(0x57F287)
-            .setDescription(`✅ Sent to ${targetChannel}.`)
-            .setTimestamp(),
+          responseBuilder.buildResult({ description: `✅ Sent to ${targetChannel}.`}),
         ] });
       } catch (e) {
         return message.reply({ embeds: [
-          new EmbedBuilder()
-            .setColor(0xED4245)
-            .setDescription(`Failed to send to ${targetChannel}: ${e.message}`),
+          responseBuilder.buildResult({ description: `Failed to send to ${targetChannel}: ${e.message}`}),
         ] });
       }
     }
@@ -129,7 +120,7 @@ module.exports = {
     // Cap duration at 1 year so users don't schedule impossibly far out.
     if (delayMs > 365.25 * 86_400_000) {
       return message.reply({ embeds: [
-        new EmbedBuilder().setColor(0xED4245).setDescription('Maximum schedule duration is **1 year**.') ],
+        responseBuilder.buildResult({ description: 'Maximum schedule duration is **1 year**.'})],
       });
     }
 
@@ -149,20 +140,12 @@ module.exports = {
       );
     } catch (e) {
       return message.reply({ embeds: [
-        new EmbedBuilder()
-          .setColor(0xED4245)
-          .setDescription(`Failed to schedule: ${e.message}`),
+        responseBuilder.buildResult({ description: `Failed to schedule: ${e.message}`}),
       ] });
     }
 
-    const embed = new EmbedBuilder()
-      .setColor(0x57F287)
-      .setDescription(
-        `✅ Scheduled — will be sent to ${targetChannel} <t:${Math.floor(triggerAt / 1000)}:R>.`
-        + (attachment ? `\n📎 Includes attachment: **${attachment.name}**` : '')
-      )
-      .setFooter({ text: `ID: #${id}` })
-      .setTimestamp();
+    const embed = responseBuilder.buildResult({ description: `✅ Scheduled — will be sent to ${targetChannel} <t:${Math.floor(triggerAt / 1000)}:R>.`
+        + (attachment ? `\n📎 Includes attachment: **${attachment.name}**` : '')});
 
     return sendTempReply(message, { embeds: [embed] });
   },
@@ -170,11 +153,9 @@ module.exports = {
 
 function usageError(message, text) {
   return message.reply({ embeds: [
-    new EmbedBuilder().setColor(0xED4245).setDescription(
-      `${text}\n\n**Usage:**\n` +
+    responseBuilder.buildResult({ description: `${text}\n\n**Usage:**\n` +
       '• `?sent <message>` — send now in this channel\n' +
       '• `?sent #channel <message>` — send now in another channel\n' +
-      '• `?sent #channel <time> <message>` — schedule for later (e.g. `30s`, `5m`, `2h`, `1d`)'
-    ),
+      '• `?sent #channel <time> <message>` — schedule for later (e.g. `30s`, `5m`, `2h`, `1d`)'}),
   ] });
 }

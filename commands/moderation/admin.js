@@ -1,7 +1,7 @@
 // src/commands/moderation/admin.js
 // Admin role management.
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 const { getDb } = require('../../utils/db');
 
 function parseRoles(raw) {
@@ -16,7 +16,7 @@ module.exports = {
   usage: 'add <@role> | remove <@role> | reset | role | show',
   cooldown: 3,
   permissions: ['Administrator'],
-  async execute(message, args) {
+  async execute(message, args, client) {
     const db = getDb();
     const action = args[0]?.toLowerCase();
     const guildId = message.guild.id;
@@ -25,35 +25,35 @@ module.exports = {
 
     // Show
     if (action === 'show' || action === 'list' || !action) {
-      if (!roles.length) return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('No admin roles configured.')] });
+      if (!roles.length) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'No admin roles configured.'})] });
       const list = roles.map(id => {
         const r = message.guild.roles.cache.get(id);
         return r ? r.toString() + ' `' + id + '`' : '`' + id + '` (not found)';
       }).join('\n') || 'None found';
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x5865F2).setTitle('Admin Roles').setDescription(list)] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ title: 'Admin Roles', description: list})] });
     }
 
     // Role
     if (action === 'role') {
-      if (!roles.length) return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('No admin role set.')] });
+      if (!roles.length) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'No admin role set.'})] });
       const r = message.guild.roles.cache.get(roles[0]);
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x5865F2).setDescription('Current admin role: ' + (r ? r.toString() : '`' + roles[0] + '` (not found)'))] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: 'Current admin role: ' + (r ? r.toString() : '`' + roles[0] + '` (not found)')})] });
     }
 
     // Reset
     if (action === 'reset') {
       await db.guildConfig.set(guildId, { adminRoles: [] });
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription('✅ Admin roles cleared.')] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: '✅ Admin roles cleared.'})] });
     }
 
     // Add
     if (action === 'add') {
       const role = message.mentions.roles.first();
       if (!role) return message.reply('Mention a role to add.');
-      if (roles.includes(role.id)) return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('That role is already an admin role.')] });
+      if (roles.includes(role.id)) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'That role is already an admin role.'})] });
       roles.push(role.id);
       await db.guildConfig.set(guildId, { adminRoles: roles });
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription('✅ Added ' + role.toString() + ' as an admin role.')] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: '✅ Added ' + role.toString() + ' as an admin role.'})] });
     }
 
     // Remove
@@ -62,7 +62,7 @@ module.exports = {
       if (!role) return message.reply('Mention a role to remove.');
       roles = roles.filter(id => id !== role.id);
       await db.guildConfig.set(guildId, { adminRoles: roles });
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription('✅ Removed ' + role.toString() + ' from admin roles.')] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: '✅ Removed ' + role.toString() + ' from admin roles.'})] });
     }
 
     return message.reply('Usage: `admin add <@role> | remove <@role> | reset | role | show`');

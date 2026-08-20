@@ -1,9 +1,10 @@
+const responseBuilder = require('../../utils/responseBuilder');
 // src/commands/moderation/purge.js
 // Production-grade Purge Command.
 // Deletes exact requested number of eligible messages, handles 100-msg batching,
 // safely filters 14-day age limit, verifies bot & user permissions, and self-deletes confirmation.
 
-const { EmbedBuilder, PermissionsBitField } = require('discord.js');
+const { PermissionsBitField } = require('discord.js');
 
 const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
 const ALL_KEYWORDS = ['all', '∞', 'infinite', 'max'];
@@ -128,7 +129,7 @@ module.exports = {
   permissions: ['ManageMessages'],
   args: true,
 
-  async execute(message, args) {
+  async execute(message, args, client) {
     if (!message.guild || !message.channel) {
       return message.reply({ content: '❌ The `purge` command can only be used in a server text channel.' });
     }
@@ -138,9 +139,7 @@ module.exports = {
     if (!userPerms || !userPerms.has(PermissionsBitField.Flags.ManageMessages)) {
       return message.reply({
         embeds: [
-          new EmbedBuilder()
-            .setColor(0xED4245)
-            .setDescription('❌ You need the **Manage Messages** permission to use this command.'),
+          responseBuilder.buildResult({ description: '❌ You need the **Manage Messages** permission to use this command.'}),
         ],
       });
     }
@@ -152,9 +151,7 @@ module.exports = {
     if (!botPerms || !botPerms.has(PermissionsBitField.Flags.ManageMessages)) {
       return message.reply({
         embeds: [
-          new EmbedBuilder()
-            .setColor(0xED4245)
-            .setDescription('❌ I do not have the **Manage Messages** permission in this channel.'),
+          responseBuilder.buildResult({ description: '❌ I do not have the **Manage Messages** permission in this channel.'}),
         ],
       });
     }
@@ -162,9 +159,7 @@ module.exports = {
     if (!botPerms.has(PermissionsBitField.Flags.ReadMessageHistory)) {
       return message.reply({
         embeds: [
-          new EmbedBuilder()
-            .setColor(0xED4245)
-            .setDescription('❌ I need the **Read Message History** permission to purge messages.'),
+          responseBuilder.buildResult({ description: '❌ I need the **Read Message History** permission to purge messages.'}),
         ],
       });
     }
@@ -188,10 +183,7 @@ module.exports = {
       if (!targetUser || !targetUser.id) {
         return message.reply({
           embeds: [
-            new EmbedBuilder()
-              .setColor(0xED4245)
-              .setTitle('❌ Invalid Target User')
-              .setDescription('Usage: `?purge user <@user> <amount|all>`'),
+            responseBuilder.buildResult({ title: '❌ Invalid Target User', description: 'Usage: `?purge user <@user> <amount|all>`'}),
           ],
         });
       }
@@ -213,17 +205,12 @@ module.exports = {
       if (!/^\d+$/.test(countArg)) {
         return message.reply({
           embeds: [
-            new EmbedBuilder()
-              .setColor(0xED4245)
-              .setTitle('❌ Invalid Amount')
-              .setDescription(
-                '❌ Please provide a positive whole number (e.g. `?purge 20`) or `all`.\n\n' +
+            responseBuilder.buildResult({ title: '❌ Invalid Amount', description: '❌ Please provide a positive whole number (e.g. `?purge 20`) or `all`.\n\n' +
                 '**Syntax Options:**\n' +
                 '• `?purge <amount|all>` — Delete recent messages\n' +
                 '• `?purge human <amount|all>` — Delete human messages only\n' +
                 '• `?purge bot <amount|all>` — Delete bot messages only\n' +
-                '• `?purge user <@user> <amount|all>` — Delete specific user messages'
-              ),
+                '• `?purge user <@user> <amount|all>` — Delete specific user messages'}),
           ],
         });
       }
@@ -232,9 +219,7 @@ module.exports = {
       if (!Number.isInteger(count) || count < 1) {
         return message.reply({
           embeds: [
-            new EmbedBuilder()
-              .setColor(0xED4245)
-              .setDescription('❌ Amount must be at least **1**.'),
+            responseBuilder.buildResult({ description: '❌ Amount must be at least **1**.'}),
           ],
         });
       }
@@ -242,9 +227,7 @@ module.exports = {
       if (count > MAX_PURGE_LIMIT) {
         return message.reply({
           embeds: [
-            new EmbedBuilder()
-              .setColor(0xED4245)
-              .setDescription(`❌ Maximum single purge amount is **${MAX_PURGE_LIMIT}** (or use \`?purge all\`).`),
+            responseBuilder.buildResult({ description: `❌ Maximum single purge amount is **${MAX_PURGE_LIMIT}** (or use \`?purge all\`).`}),
           ],
         });
       }
@@ -263,7 +246,7 @@ module.exports = {
         : `ℹ️ No ${filterLabel}messages found to delete.`;
       return sendTempConfirmation(
         message.channel,
-        { embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription(note)] },
+        { embeds: [responseBuilder.buildResult({ description: note})] },
         5000
       );
     }
@@ -275,7 +258,7 @@ module.exports = {
 
     return sendTempConfirmation(
       message.channel,
-      { embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(confirmText)] },
+      { embeds: [responseBuilder.buildResult({ description: confirmText})] },
       5000
     );
   },

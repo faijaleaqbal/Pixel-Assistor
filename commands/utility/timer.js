@@ -2,11 +2,11 @@
 // Countdown timer — sends a message when the timer fires.
 // Usage: ?timer <seconds>
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 const ms = require('../../utils/ms');
 
-const ok = (t) => new EmbedBuilder().setColor(0x57F287).setDescription(t);
-const err = (t) => new EmbedBuilder().setColor(0xED4245).setDescription(t);
+const ok = (t) => responseBuilder.buildResult({ description: t});
+const err = (t) => responseBuilder.buildResult({ description: t});
 
 module.exports = {
   name: 'timer',
@@ -15,7 +15,7 @@ module.exports = {
   usage: '<duration>',
   cooldown: 3,
   args: true,
-  async execute(message, args) {
+  async execute(message, args, client) {
     const dur = ms.parse(args[0]);
     if (!dur || dur < 1000 || dur > ms.hours(24)) return message.reply({ embeds: [err('Duration must be 1s-24h. Examples: `30s`, `5m`, `1h`.')] });
     const endsAt = Date.now() + dur;

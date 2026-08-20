@@ -2,7 +2,7 @@
 // ?whois <@user|userID> — Look up any Discord user's info, even if they've left the server.
 // Unlike ?userinfo (which requires guild membership), ?whois works for ANY Discord user.
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 const { resolveUserArg } = require('../../utils/resolveUser');
 const { getDb } = require('../../utils/db');
 
@@ -14,7 +14,7 @@ module.exports = {
   usage: '<@user|userID>',
   cooldown: 3,
   args: true,
-  async execute(message, args) {
+  async execute(message, args, client) {
     // Resolve user via shared utility (mention OR raw ID)
     const target = await resolveUserArg(message, args[0]);
     if (!target) return; // error already replied by resolveUserArg
@@ -22,10 +22,7 @@ module.exports = {
     // Try fetching guild member (expected to fail if they left / were never here)
     const member = await message.guild.members.fetch(target.id).catch(() => null);
 
-    const e = new EmbedBuilder()
-      .setColor(member?.displayHexColor || 0x5865F2)
-      .setTitle(`@${target.username}\'s User Information`)
-      .setThumbnail(target.displayAvatarURL({ size: 512 }));
+    const e = responseBuilder.buildResult({ title: `@${target.username}\'s User Information`, thumbnail: target.displayAvatarURL({ size: 512 })});
 
     // ── General ──
     e.addFields(

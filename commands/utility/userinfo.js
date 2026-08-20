@@ -1,7 +1,6 @@
 // src/commands/utility/userinfo.js
 
-const { EmbedBuilder } = require('discord.js');
-const config = require('../../utils/config');
+const responseBuilder = require('../../utils/responseBuilder');
 const { getDb } = require('../../utils/db');
 const { resolveUserArg } = require('../../utils/resolveUser');
 
@@ -12,7 +11,7 @@ module.exports = {
   usage: '<@user|userID>',
   aliases: ['ui'],
   cooldown: 3,
-  async execute(message, args) {
+  async execute(message, args, client) {
     const target = args && args[0]
       ? (await resolveUserArg(message, args[0], { silent: true })) || message.author
       : message.author;
@@ -32,20 +31,13 @@ module.exports = {
 
     const avatarUrl = target.displayAvatarURL ? target.displayAvatarURL({ size: 512 }) : null;
 
-    const e = new EmbedBuilder()
-      .setColor(member.displayHexColor || config.embedColor)
-      .setTitle(`👤 ${target.tag || target.username}`)
-      .setThumbnail(avatarUrl)
-      .addFields(
-        { name: 'ID', value: `\`${target.id}\``, inline: true },
+    const e = responseBuilder.buildResult({ title: `👤 ${target.tag || target.username}`, fields: [{ name: 'ID', value: `\`${target.id}\``, inline: true },
         { name: 'Bot', value: target.bot ? 'Yes' : 'No', inline: true },
         { name: 'Joined', value: member.joinedTimestamp ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>` : 'Unknown', inline: true },
         { name: 'Account Created', value: target.createdTimestamp ? `<t:${Math.floor(target.createdTimestamp / 1000)}:R>` : 'Unknown', inline: true },
         { name: 'Warns', value: String(warns), inline: true },
         { name: 'Reaction Wins', value: String(reaction), inline: true },
-        { name: `Roles [${roleCount}]`, value: roles, inline: false },
-      )
-      .setTimestamp();
+        { name: `Roles [${roleCount}]`, value: roles, inline: false },], thumbnail: avatarUrl});
     return message.reply({ embeds: [e], allowedMentions: { parse: [] } });
   },
 };

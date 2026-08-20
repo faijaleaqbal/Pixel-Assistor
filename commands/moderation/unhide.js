@@ -1,6 +1,6 @@
 // src/commands/moderation/unhide.js
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 
 module.exports = {
   name: 'unhide',
@@ -12,6 +12,6 @@ module.exports = {
   permissions: ['ManageChannels'],
   async execute(message) {
     await message.channel.permissionOverwrites.edit(message.guild.roles.everyone, { ViewChannel: null });
-    return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription('👁️ Channel visible again.')] });
+    return message.reply({ embeds: [responseBuilder.buildResult({ description: '👁️ Channel visible again.'})] });
   },
 };

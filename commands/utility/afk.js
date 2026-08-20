@@ -1,7 +1,7 @@
+const responseBuilder = require('../../utils/responseBuilder');
 // src/commands/utility/afk.js
 
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
-const config = require('../../utils/config');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 const { getDb } = require('../../utils/db');
 
 /**
@@ -13,12 +13,7 @@ async function activateAfk(message, reason, dmOnMention) {
   try { await message.member?.setNickname(`[AFK] ${message.member.nickname || message.author.username}`).catch(() => {}); } catch {}
 
   const unixSec = Math.floor(now / 1000);
-  const embed = new EmbedBuilder()
-    .setColor(0x57F287)
-    .setTitle('AFK Activated')
-    .setDescription(`> Reason: ${reason}\n> DM on mentions: ${dmOnMention ? 'Yes' : 'No'}\n> Time set: <t:${unixSec}:R>`)
-    .setFooter({ text: `Developed by Pixel Exchange • ${new Date().toISOString()}` })
-    .setTimestamp();
+  const embed = responseBuilder.buildResult({ title: 'AFK Activated', description: `> Reason: ${reason}\n> DM on mentions: ${dmOnMention ? 'Yes' : 'No'}\n> Time set: <t:${unixSec}:R>`});
 
   return { embed, components: [] };
 }
@@ -30,7 +25,7 @@ module.exports = {
   description: 'Set your AFK status with interactive DM-notify prompt.',
   usage: '[reason] | dm on | dm off | clear',
   cooldown: 3,
-  async execute(message, args) {
+  async execute(message, args, client) {
     const db = getDb();
     const lower = args.map((a) => a.toLowerCase());
 
@@ -38,30 +33,30 @@ module.exports = {
     if (lower[0] === 'dm' && lower[1] === 'on') {
       const existing = await db.afk.get(message.author.id, message.guild.id);
       if (!existing) {
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('You\'re not currently AFK. Use `?afk <reason>` to go AFK first.')] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: 'You\'re not currently AFK. Use `?afk <reason>` to go AFK first.'})] });
       }
       await db.afk.setDm(message.author.id, message.guild.id, true);
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription('✅ DM on mentions **enabled**.')] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: '✅ DM on mentions **enabled**.'})] });
     }
 
     // ── ?afk dm off ──
     if (lower[0] === 'dm' && lower[1] === 'off') {
       const existing = await db.afk.get(message.author.id, message.guild.id);
       if (!existing) {
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('You\'re not currently AFK. Use `?afk <reason>` to go AFK first.')] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: 'You\'re not currently AFK. Use `?afk <reason>` to go AFK first.'})] });
       }
       await db.afk.setDm(message.author.id, message.guild.id, false);
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription('✅ DM on mentions **disabled**.')] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: '✅ DM on mentions **disabled**.'})] });
     }
 
     // ── ?afk clear ──
     if (lower[0] === 'clear') {
       const removed = await db.afk.remove(message.author.id, message.guild.id);
       if (!removed) {
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('You\'re not currently AFK.')] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: 'You\'re not currently AFK.'})] });
       }
       try { await message.member?.setNickname(message.member.nickname?.replace(/^\[AFK\]\s*/, '')).catch(() => {}); } catch {}
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription('✅ Your AFK status has been cleared.')] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: '✅ Your AFK status has been cleared.'})] });
     }
 
     // ── ?afk [reason] — interactive Yes/No button flow ──
@@ -75,12 +70,7 @@ module.exports = {
       const dmBool = typeof dmVal === 'number' ? dmVal === 1 : !!dmVal;
       await db.afk.set(message.author.id, message.guild.id, reason, now, dmBool);
       const unixSec = Math.floor(now / 1000);
-      const embed = new EmbedBuilder()
-        .setColor(0x57F287)
-        .setTitle('AFK Updated')
-        .setDescription(`> Reason: ${reason}\n> DM on mentions: ${dmBool ? 'Yes' : 'No'}\n> Time set: <t:${unixSec}:R>`)
-        .setFooter({ text: `Developed by Pixel Exchange • ${new Date().toISOString()}` })
-        .setTimestamp();
+      const embed = responseBuilder.buildResult({ title: 'AFK Updated', description: `> Reason: ${reason}\n> DM on mentions: ${dmBool ? 'Yes' : 'No'}\n> Time set: <t:${unixSec}:R>`});
       return message.reply({ embeds: [embed] });
     }
 
@@ -91,12 +81,7 @@ module.exports = {
     const yesId = `afk_${uid}_yes`;
     const noId = `afk_${uid}_no`;
 
-    const settingsEmbed = new EmbedBuilder()
-      .setColor(config.embedColor)
-      .setTitle('AFK Settings')
-      .setDescription(`> User: <@${uid}>\n> Reason: ${reason}\n\nShould I DM you when you're mentioned?`)
-      .setFooter({ text: `Developed by Pixel Exchange • ${new Date().toISOString()}` })
-      .setTimestamp();
+    const settingsEmbed = responseBuilder.buildResult({ title: 'AFK Settings', description: `> User: <@${uid}>\n> Reason: ${reason}\n\nShould I DM you when you're mentioned?`});
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
@@ -141,12 +126,7 @@ module.exports = {
 
       // Update the embed in-place (interaction.update, NOT reply)
       const unixSec = Math.floor(Date.now() / 1000);
-      const activatedEmbed = new EmbedBuilder()
-        .setColor(0x57F287)
-        .setTitle('AFK Activated')
-        .setDescription(`> Reason: ${reason}\n> DM on mentions: ${dmOnMention ? 'Yes' : 'No'}\n> Time set: <t:${unixSec}:R>`)
-        .setFooter({ text: `Developed by Pixel Exchange • ${new Date().toISOString()}` })
-        .setTimestamp();
+      const activatedEmbed = responseBuilder.buildResult({ title: 'AFK Activated', description: `> Reason: ${reason}\n> DM on mentions: ${dmOnMention ? 'Yes' : 'No'}\n> Time set: <t:${unixSec}:R>`});
 
       await interaction.update({ embeds: [activatedEmbed], components: [] });
     });

@@ -1,3 +1,4 @@
+const responseBuilder = require('../../utils/responseBuilder');
 // src/commands/crypto/txid.js
 // Multi-chain crypto transaction lookup command (?txid / ?tx).
 // Supports Polygon, Ethereum, BNB Chain, Arbitrum, Base, Optimism, Litecoin, Solana, Tron.
@@ -79,16 +80,9 @@ function buildHex64SelectRow() {
 }
 
 function buildAmbiguousEmbed(hash, type = 'EVM') {
-  return new EmbedBuilder()
-    .setColor(PURPLE)
-    .setTitle('Select Network')
-    .setDescription(
-      `This hash format is shared across multiple networks (${type}).\n` +
+  return responseBuilder.buildResult({ title: 'Select Network', description: `This hash format is shared across multiple networks (${type}).\n` +
       `Please pick the target network below to look up this transaction:\n\n` +
-      `\`\`\`${hash}\`\`\``
-    )
-    .setFooter(footerNow())
-    .setTimestamp();
+      `\`\`\`${hash}\`\`\``});
 }
 
 module.exports = {
@@ -100,24 +94,18 @@ module.exports = {
   cooldown: 3,
   args: true,
 
-  async execute(message, args) {
+  async execute(message, args, client) {
     const { explicitNetwork, txIdentifier, walletAddress } = parseTxCommandInput(args);
 
     if (!txIdentifier) {
       return message.reply({
         embeds: [
-          new EmbedBuilder()
-            .setColor(RED)
-            .setTitle('Missing Transaction Identifier')
-            .setDescription(
-              `Usage: \`${config.prefix}tx [network] <hash> [walletAddress]\`\n\n` +
+          responseBuilder.buildResult({ title: 'Missing Transaction Identifier', description: `Usage: \`${config.prefix}tx [network] <hash> [walletAddress]\`\n\n` +
               `Examples:\n` +
               `• \`${config.prefix}tx polygon 0x1234...\`\n` +
               `• \`${config.prefix}tx ltc 8d5aac33...\`\n` +
               `• \`${config.prefix}tx solana 5UfgP...\`\n` +
-              `• \`${config.prefix}tx tron 3a7cab14...\``
-            )
-            .setFooter(footerNow()),
+              `• \`${config.prefix}tx tron 3a7cab14...\``}),
         ],
       });
     }
@@ -127,10 +115,7 @@ module.exports = {
       const netLabel = explicitNetwork.toUpperCase();
       const statusMsg = await message.reply({
         embeds: [
-          new EmbedBuilder()
-            .setColor(PURPLE)
-            .setDescription(`⏳ Querying **${netLabel}** for transaction \`${txIdentifier.slice(0, 16)}…\`…`)
-            .setFooter(footerNow()),
+          responseBuilder.buildResult({ description: `⏳ Querying **${netLabel}** for transaction \`${txIdentifier.slice(0, 16)}…\`…`}),
         ],
       });
 
@@ -139,12 +124,7 @@ module.exports = {
         if (!tx) {
           return statusMsg.edit({
             embeds: [
-              new EmbedBuilder()
-                .setColor(YELLOW)
-                .setTitle('Transaction Not Found')
-                .setDescription(`Transaction not found on **${netLabel}** for hash:\n\`\`\`${txIdentifier}\`\`\``)
-                .setFooter(footerNow())
-                .setTimestamp(),
+              responseBuilder.buildResult({ title: 'Transaction Not Found', description: `Transaction not found on **${netLabel}** for hash:\n\`\`\`${txIdentifier}\`\`\``}),
             ],
           });
         }
@@ -155,12 +135,7 @@ module.exports = {
         console.error(`[txid] ${explicitNetwork} lookup error:`, err);
         return statusMsg.edit({
           embeds: [
-            new EmbedBuilder()
-              .setColor(RED)
-              .setTitle('Lookup Failed')
-              .setDescription(`Unable to parse this transaction on **${netLabel}**:\n${err.message}`)
-              .setFooter(footerNow())
-              .setTimestamp(),
+            responseBuilder.buildResult({ title: 'Lookup Failed', description: `Unable to parse this transaction on **${netLabel}**:\n${err.message}`}),
           ],
         });
       }
@@ -172,19 +147,12 @@ module.exports = {
     if (detected.type === 'unknown') {
       return message.reply({
         embeds: [
-          new EmbedBuilder()
-            .setColor(RED)
-            .setTitle('Invalid Transaction Format')
-            .setDescription(
-              `Unrecognized transaction hash/signature format.\n\n` +
+          responseBuilder.buildResult({ title: 'Invalid Transaction Format', description: `Unrecognized transaction hash/signature format.\n\n` +
               `Supported formats:\n` +
               `• **EVM Chains:** \`0x...\` (66 hex characters)\n` +
               `• **Solana:** Base58 signature (~87-89 characters)\n` +
               `• **Litecoin / Tron:** 64 hexadecimal characters\n\n` +
-              `You can specify the network directly: \`${config.prefix}tx <network> <hash>\``
-            )
-            .setFooter(footerNow())
-            .setTimestamp(),
+              `You can specify the network directly: \`${config.prefix}tx <network> <hash>\``}),
         ],
       });
     }
@@ -208,10 +176,7 @@ module.exports = {
     if (detected.type === 'solana') {
       const statusMsg = await message.reply({
         embeds: [
-          new EmbedBuilder()
-            .setColor(PURPLE)
-            .setDescription(`⏳ Querying **Solana** for signature \`${txIdentifier.slice(0, 16)}…\`…`)
-            .setFooter(footerNow()),
+          responseBuilder.buildResult({ description: `⏳ Querying **Solana** for signature \`${txIdentifier.slice(0, 16)}…\`…`}),
         ],
       });
 
@@ -220,12 +185,7 @@ module.exports = {
         if (!tx) {
           return statusMsg.edit({
             embeds: [
-              new EmbedBuilder()
-                .setColor(YELLOW)
-                .setTitle('Transaction Not Found')
-                .setDescription(`Transaction not found on **Solana** for signature:\n\`\`\`${txIdentifier}\`\`\``)
-                .setFooter(footerNow())
-                .setTimestamp(),
+              responseBuilder.buildResult({ title: 'Transaction Not Found', description: `Transaction not found on **Solana** for signature:\n\`\`\`${txIdentifier}\`\`\``}),
             ],
           });
         }
@@ -236,12 +196,7 @@ module.exports = {
         console.error(`[txid] Solana lookup error:`, err);
         return statusMsg.edit({
           embeds: [
-            new EmbedBuilder()
-              .setColor(RED)
-              .setTitle('Solana Lookup Failed')
-              .setDescription(`Unable to parse this transaction on **Solana**:\n${err.message}`)
-              .setFooter(footerNow())
-              .setTimestamp(),
+            responseBuilder.buildResult({ title: 'Solana Lookup Failed', description: `Unable to parse this transaction on **Solana**:\n${err.message}`}),
           ],
         });
       }
@@ -272,9 +227,7 @@ module.exports = {
       if (!st) {
         return interaction.update({
           embeds: [
-            new EmbedBuilder()
-              .setColor(YELLOW)
-              .setDescription('This lookup has expired. Please run `?tx <hash>` again.'),
+            responseBuilder.buildResult({ description: 'This lookup has expired. Please run `?tx <hash>` again.'}),
           ],
           components: [],
         });
@@ -293,10 +246,7 @@ module.exports = {
 
       await interaction.update({
         embeds: [
-          new EmbedBuilder()
-            .setColor(PURPLE)
-            .setDescription(`⏳ Querying **${opt.label}** for \`${st.hash.slice(0, 16)}…\`…`)
-            .setFooter(footerNow()),
+          responseBuilder.buildResult({ description: `⏳ Querying **${opt.label}** for \`${st.hash.slice(0, 16)}…\`…`}),
         ],
         components: [],
       });
@@ -306,12 +256,7 @@ module.exports = {
         if (!tx) {
           return interaction.message.edit({
             embeds: [
-              new EmbedBuilder()
-                .setColor(YELLOW)
-                .setTitle('Transaction Not Found')
-                .setDescription(`No transaction found on **${opt.label}** for hash:\n\`\`\`${st.hash}\`\`\``)
-                .setFooter(footerNow())
-                .setTimestamp(),
+              responseBuilder.buildResult({ title: 'Transaction Not Found', description: `No transaction found on **${opt.label}** for hash:\n\`\`\`${st.hash}\`\`\``}),
             ],
           });
         }
@@ -322,12 +267,7 @@ module.exports = {
         console.error(`[txid] ${opt.label} error:`, err);
         await interaction.message.edit({
           embeds: [
-            new EmbedBuilder()
-              .setColor(RED)
-              .setTitle('Lookup Failed')
-              .setDescription(`Unable to parse transaction on **${opt.label}**:\n${err.message}`)
-              .setFooter(footerNow())
-              .setTimestamp(),
+            responseBuilder.buildResult({ title: 'Lookup Failed', description: `Unable to parse transaction on **${opt.label}**:\n${err.message}`}),
           ],
         });
       } finally {

@@ -1,8 +1,7 @@
 // src/commands/utility/enlarge.js
 // Show a custom emoji at full size.
 
-const { EmbedBuilder } = require('discord.js');
-const config = require('../../utils/config');
+const responseBuilder = require('../../utils/responseBuilder');
 
 module.exports = {
   name: 'enlarge',
@@ -10,7 +9,7 @@ module.exports = {
   description: 'Show a custom emoji at full size. Usage: enlarge <emoji>',
   usage: '<emoji>',
   cooldown: 3,
-  async execute(message, args) {
+  async execute(message, args, client) {
     const input = args.join(' ').trim();
     if (!input) return message.reply('Please provide an emoji.');
 
@@ -21,20 +20,12 @@ module.exports = {
       const ext = isAnimated ? 'gif' : 'png';
       const url = `https://cdn.discordapp.com/emojis/${id}.${ext}?size=4096`;
 
-      const embed = new EmbedBuilder()
-        .setColor(config.embedColor)
-        .setTitle('🔍 Enlarged Emoji')
-        .setImage(url)
-        .setTimestamp();
+      const embed = responseBuilder.buildResult({ title: '🔍 Enlarged Emoji', image: url});
 
       return message.reply({ embeds: [embed] });
     }
 
-    const embed = new EmbedBuilder()
-      .setColor(config.embedColor)
-      .setTitle('🔍 Emoji')
-      .setDescription(input)
-      .setTimestamp();
+    const embed = responseBuilder.buildResult({ title: '🔍 Emoji', description: input});
 
     return message.reply({ embeds: [embed] });
   },

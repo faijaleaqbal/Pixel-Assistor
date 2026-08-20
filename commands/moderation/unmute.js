@@ -1,6 +1,6 @@
 // src/commands/moderation/unmute.js
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 const { resolveMemberArg } = require('../../utils/resolveUser');
 
 module.exports = {
@@ -12,14 +12,14 @@ module.exports = {
   cooldown: 3,
   permissions: ['ModerateMembers'],
   args: true,
-  async execute(message, args) {
+  async execute(message, args, client) {
     const target = await resolveMemberArg(message, args[0]);
     if (!target) return;
     try {
       await target.timeout(null);
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`🔊 Unmuted ${target.user.tag}`)] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: `🔊 Unmuted ${target.user.tag}`})] });
     } catch (e) {
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`Failed: ${e.message}`)] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: `Failed: ${e.message}`})] });
     }
   },
 };

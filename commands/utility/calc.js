@@ -1,8 +1,8 @@
+const responseBuilder = require('../../utils/responseBuilder');
 // src/commands/utility/calc.js
 // Safe arithmetic calculator. Evaluates math expressions deterministically without eval.
 
-const { EmbedBuilder, ApplicationCommandOptionType } = require('discord.js');
-const config = require('../../utils/config');
+const { ApplicationCommandOptionType } = require('discord.js');
 const { evaluate } = require('../../utils/mathEval');
 
 module.exports = {
@@ -22,7 +22,7 @@ module.exports = {
       required: true,
     },
   ],
-  async execute(message, args) {
+  async execute(message, args, client) {
     const expr = args.join(' ');
     const embed = evaluateMath(expr);
     return message.reply({ embeds: [embed] });
@@ -37,15 +37,9 @@ module.exports = {
 function evaluateMath(expr) {
   try {
     const result = evaluate(expr);
-    return new EmbedBuilder()
-      .setColor(config.embedColor)
-      .setTitle('🧮 Calculator')
-      .addFields(
-        { name: 'Input', value: `\`${expr}\``, inline: true },
-        { name: 'Result', value: `\`${result}\``, inline: true },
-      )
-      .setTimestamp();
+    return responseBuilder.buildResult({ title: '🧮 Calculator', fields: [{ name: 'Input', value: `\`${expr}\``, inline: true },
+        { name: 'Result', value: `\`${result}\``, inline: true },]});
   } catch (e) {
-    return new EmbedBuilder().setColor(0xED4245).setDescription(`❌ Invalid expression: ${e.message}`);
+    return responseBuilder.buildResult({ description: `❌ Invalid expression: ${e.message}`});
   }
 }

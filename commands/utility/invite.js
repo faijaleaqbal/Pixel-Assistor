@@ -1,7 +1,7 @@
 // src/commands/utility/invite.js
 // Show the bot's invite link.
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 const config = require('../../utils/config');
 
 module.exports = {
@@ -17,11 +17,7 @@ module.exports = {
 
     const link = `https://discord.com/oauth2/authorize?client_id=${clientId}&permissions=8&scope=bot%20applications.commands`;
 
-    const embed = new EmbedBuilder()
-      .setColor(0x5865F2)
-      .setTitle('🔗 Invite Me')
-      .setDescription(`[Click here to invite me](${link})`)
-      .setTimestamp();
+    const embed = responseBuilder.buildResult({ title: '🔗 Invite Me', description: `[Click here to invite me](${link})`});
 
     return message.reply({ embeds: [embed] });
   },

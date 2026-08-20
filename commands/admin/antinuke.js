@@ -10,12 +10,12 @@
 //   ?antinuke whitelist [add|remove|show|reset] [@user]
 //   ?antinuke wlrole [add|remove|list|reset] [@role]
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 const { getDb } = require('../../utils/db');
 const { isOwner } = require('../../utils/perms');
 const { resolveUserArg } = require('../../utils/resolveUser');
 
-const E = (c, d) => new EmbedBuilder().setColor(c).setDescription(d);
+const E = (c, d) => responseBuilder.buildResult({ description: d});
 const RED = 0xED4245, GREEN = 0x57F287, BLUE = 0x5865F2, YELLOW = 0xFEE75C;
 
 function isAuth(msg) {
@@ -30,7 +30,7 @@ module.exports = {
   usage: '<enable|disable|setup|status|logging|punishment|owner|whitelist|wlrole> [args]',
   cooldown: 3,
 
-  async execute(message, args) {
+  async execute(message, args, client) {
     if (!isAuth(message)) return message.reply({ embeds: [E(RED, 'Only the server owner or bot owner can use this command.')] });
 
     const db = getDb();
@@ -40,7 +40,7 @@ module.exports = {
     // ── No args → brief status ──
     if (!args.length) {
       const on = cfg.enabled ? '**ON** ✅' : '**OFF** ❌';
-      return message.reply({ embeds: [new EmbedBuilder().setColor(BLUE).setTitle('Anti-Nuke Status').setDescription(`Enabled: ${on}\nPunishment: \`${cfg.punishment}\`\nOwners: ${cfg.owners.length}\nWhitelisted users: ${cfg.whitelist.length}\nWhitelisted roles: ${cfg.wlRoles.length}`)] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ title: 'Anti-Nuke Status', description: `Enabled: ${on}\nPunishment: \`${cfg.punishment}\`\nOwners: ${cfg.owners.length}\nWhitelisted users: ${cfg.whitelist.length}\nWhitelisted roles: ${cfg.wlRoles.length}`})] });
     }
 
     const sub = args[0].toLowerCase();
@@ -74,15 +74,12 @@ module.exports = {
       const ownerList = cfg.owners.length ? cfg.owners.map((id, i) => `${i + 1}. <@${id}>`).join('\n') : '`None`';
       const wlList = cfg.whitelist.length ? cfg.whitelist.map((id, i) => `${i + 1}. <@${id}>`).join('\n') : '`None`';
       const wlRoleList = cfg.wlRoles.length ? cfg.wlRoles.map((id, i) => `${i + 1}. <@&${id}>`).join('\n') : '`None`';
-      return message.reply({ embeds: [new EmbedBuilder().setColor(BLUE).setTitle('Anti-Nuke — Full Configuration')
-        .addFields(
-          { name: 'Enabled', value: cfg.enabled ? '✅ Yes' : '❌ No', inline: true },
+      return message.reply({ embeds: [responseBuilder.buildResult({ title: 'Anti-Nuke — Full Configuration', fields: [{ name: 'Enabled', value: cfg.enabled ? '✅ Yes' : '❌ No', inline: true },
           { name: 'Punishment', value: `\`${cfg.punishment}\``, inline: true },
           { name: 'Log Channel', value: logCh, inline: true },
           { name: `Owners (${cfg.owners.length})`, value: ownerList, inline: false },
           { name: `Whitelisted Users (${cfg.whitelist.length})`, value: wlList, inline: false },
-          { name: `Whitelisted Roles (${cfg.wlRoles.length})`, value: wlRoleList, inline: false },
-        ).setTimestamp()] });
+          { name: `Whitelisted Roles (${cfg.wlRoles.length})`, value: wlRoleList, inline: false },]})] });
     }
 
     // ── Logging ──
@@ -110,7 +107,7 @@ module.exports = {
       // ?antinuke owner  (no action) → list
       if (!action || action === 'list') {
         if (!cfg.owners.length) return message.reply({ embeds: [E(BLUE, 'No owners configured. Use `?antinuke owner add @user`.')] });
-        return message.reply({ embeds: [new EmbedBuilder().setColor(BLUE).setTitle(`Owners (${cfg.owners.length})`).setDescription(cfg.owners.map((id, i) => `${i + 1}. <@${id}>`).join('\n'))] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ title: `Owners (${cfg.owners.length})`, description: cfg.owners.map((id, i) => `${i + 1}. <@${id}>`).join('\n')})] });
       }
 
       if (action === 'add') {
@@ -145,7 +142,7 @@ module.exports = {
 
       if (!action || action === 'show') {
         if (!cfg.whitelist.length) return message.reply({ embeds: [E(BLUE, 'No whitelisted users. Use `?antinuke whitelist add @user`.')] });
-        return message.reply({ embeds: [new EmbedBuilder().setColor(BLUE).setTitle(`Whitelisted Users (${cfg.whitelist.length})`).setDescription(cfg.whitelist.map((id, i) => `${i + 1}. <@${id}>`).join('\n'))] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ title: `Whitelisted Users (${cfg.whitelist.length})`, description: cfg.whitelist.map((id, i) => `${i + 1}. <@${id}>`).join('\n')})] });
       }
 
       if (action === 'add') {
@@ -180,7 +177,7 @@ module.exports = {
 
       if (!action || action === 'list') {
         if (!cfg.wlRoles.length) return message.reply({ embeds: [E(BLUE, 'No whitelisted roles. Use `?antinuke wlrole add @role`.')] });
-        return message.reply({ embeds: [new EmbedBuilder().setColor(BLUE).setTitle(`Whitelisted Roles (${cfg.wlRoles.length})`).setDescription(cfg.wlRoles.map((id, i) => `${i + 1}. <@&${id}>`).join('\n'))] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ title: `Whitelisted Roles (${cfg.wlRoles.length})`, description: cfg.wlRoles.map((id, i) => `${i + 1}. <@&${id}>`).join('\n')})] });
       }
 
       if (action === 'add') {

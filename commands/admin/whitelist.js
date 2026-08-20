@@ -9,13 +9,13 @@
 //   ?whitelist list            — show WL
 //   ?whitelist clear            — clear all
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 const { getDb } = require('../../utils/db');
 const { isOwner } = require('../../utils/perms');
 const { resolveMemberArg } = require('../../utils/resolveUser');
 const { paginate } = require('../../utils/pagination');
 
-const E = (c, d) => new EmbedBuilder().setColor(c).setDescription(d);
+const E = (c, d) => responseBuilder.buildResult({ description: d});
 
 function isAuth(msg) {
   return msg.guild.ownerId === msg.author.id || isOwner(msg.author.id);
@@ -31,7 +31,7 @@ module.exports = {
   ownerOnly: false,
   args: true,
 
-  async execute(message, args) {
+  async execute(message, args, client) {
     if (!isAuth(message)) {
       return message.reply({ embeds: [E(0xED4245, 'Only the **server owner** or **bot owner** can manage the command whitelist.')] });
     }
@@ -100,12 +100,7 @@ module.exports = {
 
       for (let i = 0; i < list.length; i += CHUNK) {
         const pageNum = Math.floor(i / CHUNK) + 1;
-        embeds.push(new EmbedBuilder()
-          .setColor(0x5865F2)
-          .setTitle(`📋 Command Whitelist${totalPages > 1 ? ` (${pageNum}/${totalPages})` : ''}`)
-          .setDescription(list.slice(i, i + CHUNK).join('\n'))
-          .setFooter({ text: `${rows.length} user${rows.length > 1 ? 's' : ''} whitelisted — can use commands without prefix` })
-          .setTimestamp());
+        embeds.push(responseBuilder.buildResult({ title: `📋 Command Whitelist${totalPages > 1 ? ` (${pageNum}/${totalPages})` : ''}`, description: list.slice(i, i + CHUNK).join('\n')}));
       }
 
       if (embeds.length === 1) {

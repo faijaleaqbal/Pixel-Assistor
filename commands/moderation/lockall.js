@@ -1,6 +1,7 @@
+const responseBuilder = require('../../utils/responseBuilder');
 // src/commands/moderation/lockall.js
 
-const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { PermissionFlagsBits } = require('discord.js');
 
 module.exports = {
   name: 'lockall',
@@ -18,7 +19,7 @@ module.exports = {
       const ow = c.permissionOverwrites.cache.get(everyone.id);
       return !ow || !ow.deny.has(PermissionFlagsBits.SendMessages);
     });
-    if (!channels.size) return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('All text channels are already locked.')] });
+    if (!channels.size) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'All text channels are already locked.'})] });
     let count = 0;
     for (const ch of channels.values()) {
       try {
@@ -26,6 +27,6 @@ module.exports = {
         count++;
       } catch { /* skip */ }
     }
-    return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`🔒 Locked ${count} text channel(s).`)] });
+    return message.reply({ embeds: [responseBuilder.buildResult({ description: `🔒 Locked ${count} text channel(s).`})] });
   },
 };

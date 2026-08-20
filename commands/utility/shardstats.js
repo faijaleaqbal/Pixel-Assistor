@@ -1,8 +1,7 @@
 // src/commands/utility/shardstats.js
 // Show shard information if the bot is sharded.
 
-const { EmbedBuilder } = require('discord.js');
-const config = require('../../utils/config');
+const responseBuilder = require('../../utils/responseBuilder');
 
 module.exports = {
   name: 'shardstats',
@@ -15,11 +14,7 @@ module.exports = {
     const client = message.client;
 
     if (!client.shard) {
-      return message.reply({ embeds: [new EmbedBuilder()
-        .setColor(0xFEE75C)
-        .setTitle('🔌 Shard Stats')
-        .setDescription('This bot is **not sharded**.')
-        .setTimestamp()] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ title: '🔌 Shard Stats', description: 'This bot is **not sharded**.'})] });
     }
 
     const guildCounts = await client.shard.fetchClientValues('guilds.cache.size');
@@ -30,16 +25,10 @@ module.exports = {
       fields.push({ name: `Shard ${i}`, value: `${guildCounts[i]} servers`, inline: true });
     }
 
-    const embed = new EmbedBuilder()
-      .setColor(config.embedColor)
-      .setTitle('🔌 Shard Stats')
-      .addFields(
-        { name: 'Total Shards', value: String(client.shard.count), inline: true },
+    const embed = responseBuilder.buildResult({ title: '🔌 Shard Stats', fields: [{ name: 'Total Shards', value: String(client.shard.count), inline: true },
         { name: 'Current Shard', value: String(client.shard.ids[0]), inline: true },
         { name: 'Total Servers', value: String(totalGuilds), inline: true },
-        ...fields,
-      )
-      .setTimestamp();
+        ...fields,]});
 
     return message.reply({ embeds: [embed] });
   },

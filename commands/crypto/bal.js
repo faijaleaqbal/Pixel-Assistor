@@ -1,3 +1,4 @@
+const responseBuilder = require('../../utils/responseBuilder');
 // src/commands/crypto/bal.js
 // ?bal <address> — Multi-chain wallet balance lookup.
 //
@@ -76,16 +77,9 @@ function buildNetworkSelect() {
 }
 
 function buildAmbiguousEmbed(address) {
-  return new EmbedBuilder()
-    .setColor(PURPLE)
-    .setTitle('Which Chain?')
-    .setDescription(
-      `> Address: \`${shortAddr(address)}\`\n` +
+  return responseBuilder.buildResult({ title: 'Which Chain?', description: `> Address: \`${shortAddr(address)}\`\n` +
       `> This address matches multiple EVM chains.\n` +
-      `> Select the correct network below.`
-    )
-    .setFooter(footerNow())
-    .setTimestamp();
+      `> Select the correct network below.`});
 }
 
 function buildBalanceEmbed(b) {
@@ -120,12 +114,7 @@ function buildBalanceEmbed(b) {
   lines.push(`Address:`);
   lines.push(`> \`${b.address}\``);
 
-  const e = new EmbedBuilder()
-    .setColor(GREEN)
-    .setTitle(`${b.chain} Wallet Balance`)
-    .setDescription(lines.join('\n'))
-    .setFooter(footerNow())
-    .setTimestamp();
+  const e = responseBuilder.buildResult({ title: `${b.chain} Wallet Balance`, description: lines.join('\n')});
 
   if (b.explorerAddrUrl) {
     const row = new ActionRowBuilder().addComponents(
@@ -148,20 +137,16 @@ module.exports = {
   usage: '<address>',
   cooldown: 5,
   args: true,
-  async execute(message, args) {
+  async execute(message, args, client) {
     const address = String(args[0] || '').trim();
     if (!address) {
-      return message.reply({ embeds: [new EmbedBuilder().setColor(RED).setDescription(`Usage: \`${config.prefix}bal <address>\``)] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: `Usage: \`${config.prefix}bal <address>\``})] });
     }
 
     const detected = detectAddressChain(address);
 
     if (detected.type === 'unknown') {
-      return message.reply({ embeds: [new EmbedBuilder().setColor(RED)
-        .setTitle('Invalid Address')
-        .setDescription('Invalid or unrecognized wallet address format.\nSupported: EVM (`0x…` 42 chars), Tron (`T…`), Litecoin (`L…`/`M…`/`3…`/`ltc1…`), Solana (base58 32-44 chars).')
-        .setFooter(footerNow())
-        .setTimestamp()] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ title: 'Invalid Address', description: 'Invalid or unrecognized wallet address format.\nSupported: EVM (`0x…` 42 chars), Tron (`T…`), Litecoin (`L…`/`M…`/`3…`/`ltc1…`), Solana (base58 32-44 chars).'})] });
     }
 
     // ── EVM-ambiguous: show the network select menu ──
@@ -175,7 +160,7 @@ module.exports = {
     }
 
     // ── Direct lookups for non-ambiguous chains ──
-    const m = await message.reply({ embeds: [new EmbedBuilder().setColor(PURPLE).setDescription(`⏳ Fetching ${detected.type === 'tron' ? 'Tron' : detected.type === 'litecoin' ? 'Litecoin' : 'Solana'} balance…`).setFooter(footerNow())] });
+    const m = await message.reply({ embeds: [responseBuilder.buildResult({ description: `⏳ Fetching ${detected.type === 'tron' ? 'Tron' : detected.type === 'litecoin' ? 'Litecoin' : 'Solana'} balance…`})] });
 
     try {
       let bal;
@@ -195,7 +180,7 @@ module.exports = {
       }
       return m.edit(buildBalanceEmbed(bal));
     } catch (e) {
-      return m.edit({ embeds: [new EmbedBuilder().setColor(RED).setDescription(`Balance lookup failed: **${e.message}**`)] });
+      return m.edit({ embeds: [responseBuilder.buildResult({ description: `Balance lookup failed: **${e.message}**`})] });
     }
   },
 
@@ -205,7 +190,7 @@ module.exports = {
       if (!interaction.isStringSelectMenu() || interaction.customId !== 'bal_network_select') return;
       const st = state.get(interaction.message.id);
       if (!st) {
-        return interaction.update({ embeds: [new EmbedBuilder().setColor(YELLOW).setDescription('This lookup has expired. Run `?bal <address>` again.')], components: [] });
+        return interaction.update({ embeds: [responseBuilder.buildResult({ description: 'This lookup has expired. Run `?bal <address>` again.'})], components: [] });
       }
       // Only the original invoker can pick the network — prevents other users in
       // the channel from triggering API calls on the invoker's behalf.
@@ -218,7 +203,7 @@ module.exports = {
 
       // Edit to "Fetching <Chain> balance..."
       await interaction.update({
-        embeds: [new EmbedBuilder().setColor(PURPLE).setDescription(`Fetching ${opt.label} balance…`).setFooter(footerNow())],
+        embeds: [responseBuilder.buildResult({ description: `Fetching ${opt.label} balance…`})],
         components: [],
       });
 
@@ -233,7 +218,7 @@ module.exports = {
         }
         await interaction.message.edit(buildBalanceEmbed(bal));
       } catch (e) {
-        await interaction.message.edit({ embeds: [new EmbedBuilder().setColor(RED).setDescription(`${opt.label} balance lookup failed: **${e.message}**`)] }).catch(() => {});
+        await interaction.message.edit({ embeds: [responseBuilder.buildResult({ description: `${opt.label} balance lookup failed: **${e.message}**`})] }).catch(() => {});
       } finally {
         state.delete(interaction.message.id);
       }

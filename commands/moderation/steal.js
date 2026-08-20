@@ -1,7 +1,7 @@
 // src/commands/moderation/steal.js
 // Steal emojis or stickers by attachment or URL. Usage: steal <name> [emoji|url]
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 
 module.exports = {
   name: 'steal',
@@ -12,19 +12,19 @@ module.exports = {
   cooldown: 3,
   permissions: ['ManageEmojisAndStickers'],
   args: true,
-  async execute(message, args) {
+  async execute(message, args, client) {
     const name = args[0];
     const url = args[1] || message.attachments.first()?.url;
     if (!name || !url) return message.reply('Usage: `steal <name> [url]` — attach an image or pass a URL.');
     try {
       if (/\.gif/.test(url)) {
         const e = await message.guild.emojis.create({ attachment: url, name });
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Stole emoji ${e} (\`${name}\`)`)] });
+        return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Stole emoji ${e} (\`${name}\`)`})] });
       }
       const e = await message.guild.emojis.create({ attachment: url, name });
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Stole emoji ${e} (\`${name}\`)`)] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Stole emoji ${e} (\`${name}\`)`})] });
     } catch (e) {
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`Failed: ${e.message}`)] });
+      return message.reply({ embeds: [responseBuilder.buildResult({ description: `Failed: ${e.message}`})] });
     }
   },
 };

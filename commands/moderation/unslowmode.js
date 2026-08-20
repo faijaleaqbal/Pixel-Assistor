@@ -1,6 +1,6 @@
 // src/commands/moderation/unslowmode.js
 
-const { EmbedBuilder } = require('discord.js');
+const responseBuilder = require('../../utils/responseBuilder');
 
 module.exports = {
   name: 'unslowmode',
@@ -12,6 +12,6 @@ module.exports = {
   permissions: ['ManageChannels'],
   async execute(message) {
     await message.channel.setRateLimitPerUser(0);
-    return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription('🐇 Slowmode disabled.')] });
+    return message.reply({ embeds: [responseBuilder.buildResult({ description: '🐇 Slowmode disabled.'})] });
   },
 };
