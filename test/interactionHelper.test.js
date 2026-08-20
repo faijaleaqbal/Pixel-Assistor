@@ -100,4 +100,32 @@ describe('Safe Interaction Helper', () => {
     const followRes = await safeFollowUp(mockInt, { content: 'followed' });
     assert.deepEqual(followRes, { content: 'followed' });
   });
+
+  it('safeUpdate: delegates to update when unacknowledged and handles expired safely', async () => {
+    let updateOpts = null;
+    const mockInt = {
+      replied: false,
+      deferred: false,
+      update: async (opts) => {
+        updateOpts = opts;
+        return opts;
+      },
+    };
+
+    const res = await require('../utils/interactionHelper').safeUpdate(mockInt, { content: 'updated' });
+    assert.deepEqual(updateOpts, { content: 'updated' });
+    assert.deepEqual(res, { content: 'updated' });
+
+    const errorInt = {
+      replied: false,
+      deferred: false,
+      update: async () => {
+        const err = new Error('Unknown interaction');
+        err.code = 10062;
+        throw err;
+      },
+    };
+    const nullRes = await require('../utils/interactionHelper').safeUpdate(errorInt, { content: 'err' });
+    assert.equal(nullRes, null);
+  });
 });

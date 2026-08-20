@@ -41,6 +41,11 @@ function makeFooter() {
   };
 }
 
+function compactDescription(str, max = 80) {
+  if (!str) return 'No description provided.';
+  return str.length > max ? `${str.slice(0, max - 3)}...` : str;
+}
+
 module.exports = {
   name: 'help',
   category: 'utility',
@@ -57,6 +62,12 @@ module.exports = {
       required: false,
     },
   ],
+  buildHomeEmbed,
+  buildCategoryEmbed,
+  buildCommandDetailEmbed,
+  getAvailableCategories,
+  calcTotalPages,
+  compactDescription,
 
   // ── Prefix execution (?help / ?help <command>) ──
   async execute(message, args, client) {
@@ -141,7 +152,7 @@ module.exports = {
       // Security check: only the invoking user may control this menu
       if (st && st.userId && st.userId !== interaction.user.id) {
         return interaction.reply({
-          content: `❌ This help menu belongs to **${st.username || 'another user'}**. Use \`${st.prefix || currentPrefix}help\` to open your own menu!`,
+          content: "This Help Menu isn't yours.",
           ephemeral: true,
         });
       }
@@ -259,27 +270,26 @@ function buildHomeEmbed(client, prefix, user) {
   const availableCats = getAvailableCategories();
   const totalCats = availableCats.length;
   const username = user?.username || 'there';
+  const greeting = user?.id ? `Hey <@${user.id}>!` : `Hey **${username}**!`;
+  const devName = config.helpFooterName || 'Developer';
+  const timestamp = Math.floor(Date.now() / 1000);
 
   const desc = [
-    `🤖 **Type ${prefix}help for more Info**\n`,
-    `«Total Commands: ${totalCmds}`,
-    `Categories: ${totalCats}»\n`,
+    `🤖 **Type **${prefix}help** for more Info**\n`,
+    `«Total Commands: **${totalCmds}** | Categories: **${totalCats}**»\n`,
     `━━━━━━━━━━━━━━━━━━━━\n`,
-    `👑 **Hey ${username}!**\n`,
-    `I'm **Pixel Assistant**, your friendly companion.\n`,
-    `Prefix for this server: \`${prefix}\`\n`,
+    `👑 **${greeting}**\n`,
+    `I'm *Pixel-Assistor*, your friendly companion.\n`,
+    `Prefix for this server: **${prefix}**\n`,
     `Pick from the menu below to continue!`,
+    '',
+    `-# Developed by **${devName}** • <t:${timestamp}:f>`,
   ].join('\n');
 
   const embed = new EmbedBuilder()
     .setColor(config.embedColor || 0x5865F2)
     .setTitle('Help Menu')
-    .setDescription(desc)
-    .setFooter(makeFooter());
-
-  if (client?.user?.displayAvatarURL) {
-    embed.setThumbnail(client.user.displayAvatarURL({ dynamic: true }));
-  }
+    .setDescription(desc);
 
   return embed;
 }
@@ -294,27 +304,34 @@ function buildCategoryEmbed(client, cat, page, totalPages, prefix) {
   const slice = cmds.slice(start, start + COMMANDS_PER_PAGE);
 
   const displayName = DISPLAY[cat] || cat.charAt(0).toUpperCase() + cat.slice(1);
+  const devName = config.helpFooterName || 'Developer';
+  const timestamp = Math.floor(Date.now() / 1000);
+
+  if (!slice.length) {
+    const desc = `No commands available in this category.\n\n-# Developed by **${devName}** • <t:${timestamp}:f>`;
+    return new EmbedBuilder()
+      .setColor(config.embedColor || 0x5865F2)
+      .setTitle(`${displayName} Commands • Page 1/1`)
+      .setDescription(desc);
+  }
 
   const commandLines = slice.map((c) => {
-    return `«"${prefix}${c.name}" — ${c.description || 'No description.'}»`;
+    const hasGroup = subs.get(c.name).length > 0 ? ' **[Group]**' : '';
+    const d = c.description ? (c.description.length > 80 ? c.description.slice(0, 77) + '...' : c.description) : 'No description provided.';
+    return `\`${prefix}${c.name}\`${hasGroup} — ${d}`;
   });
 
   const desc = [
     commandLines.join('\n\n'),
     '\n━━━━━━━━━━━━━━━━━━━━',
+    '',
+    `-# Developed by **${devName}** • <t:${timestamp}:f>`,
   ].join('\n');
 
-  const embed = new EmbedBuilder()
+  return new EmbedBuilder()
     .setColor(config.embedColor || 0x5865F2)
     .setTitle(`${displayName} Commands • Page ${safePage + 1}/${totalPages}`)
-    .setDescription(desc)
-    .setFooter(makeFooter());
-
-  if (client?.user?.displayAvatarURL) {
-    embed.setThumbnail(client.user.displayAvatarURL({ dynamic: true }));
-  }
-
-  return embed;
+    .setDescription(desc);
 }
 
 /**
@@ -441,6 +458,8 @@ function makeRows(cat, page, totalPages) {
   return rows;
 }
 
+const responseBuilder = require('../../utils/responseBuilder');
+
 function err(text) {
-  return new EmbedBuilder().setColor(0xED4245).setDescription(`❌ ${text}`).setFooter(makeFooter());
+  return responseBuilder.buildError({ title: 'Help Menu', error: text });
 }

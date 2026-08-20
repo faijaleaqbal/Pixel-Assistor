@@ -8,8 +8,8 @@ const EMOJI = {
   fun: '🎉',
   games: '🎮',
   moderation: '🛡️',
-  upi: '💸',
-  utility: '🧰',
+  upi: '💳',
+  utility: '🔧',
 };
 
 const DISPLAY = {

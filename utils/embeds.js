@@ -1,22 +1,15 @@
 // src/utils/embeds.js
 // Central embed factory. Standardizes colors, typography, footers, and styles.
+// Backward compatibility layer wrapping responseBuilder.
 
 const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
-const config = require('./config');
+const responseBuilder = require('./responseBuilder');
 
-const COLORS = {
-  PRIMARY: config.embedColor || 0x5865F2,
-  SUCCESS: 0x57F287,
-  ERROR: 0xED4245,
-  WARN: 0xFEE75C,
-  INFO: 0x5865F2,
-  PURPLE: 0x5865F2,
-  DARK: 0x2B2D31,
-};
+const COLORS = responseBuilder.COLORS;
 
 const color = (override) => override ?? COLORS.PRIMARY;
 
-function base({ title = '', description = '', color: c, thumbnail, image, author, footer, fields = [], timestamp = true } = {}) {
+function base({ title = '', description = '', color: c, thumbnail, image, author, footer, fields = [], timestamp = false } = {}) {
   const e = new EmbedBuilder()
     .setColor(color(c))
     .setTitle(title || null)
@@ -31,36 +24,28 @@ function base({ title = '', description = '', color: c, thumbnail, image, author
   return e;
 }
 
-function success(message, title = 'Success') {
-  return base({ title: `✅ ${title}`, description: message, color: COLORS.SUCCESS });
+function success(message, title = 'Success', client) {
+  return responseBuilder.buildSuccess({ title, description: message, client });
 }
 
-function error(message, title = 'Error') {
-  return base({ title: `❌ ${title}`, description: message, color: COLORS.ERROR });
+function error(message, title = 'Error', client) {
+  return responseBuilder.buildError({ title, error: message, client });
 }
 
-function warn(message, title = 'Warning') {
-  return base({ title: `⚠️ ${title}`, description: message, color: COLORS.WARN });
+function warn(message, title = 'Warning', client) {
+  return responseBuilder.buildWarning({ title, description: message, client });
 }
 
-function info(message, title = 'Information') {
-  return base({ title: `ℹ️ ${title}`, description: message, color: COLORS.INFO });
+function info(message, title = 'Information', client) {
+  return responseBuilder.buildInfo({ title, description: message, client });
 }
 
-function loading(message = 'Processing request…') {
-  return base({ description: `⏳ ${message}`, color: COLORS.PRIMARY });
+function loading(message = 'Processing request…', client) {
+  return responseBuilder.buildInfo({ title: 'Processing', emoji: '⏳', description: message, client });
 }
 
-// Owner-name resolver — used in footers across the bot.
-async function ownerName(client) {
-  if (config.helpFooterName) return config.helpFooterName;
-  try {
-    if (config.ownerId) {
-      const u = await client?.users?.fetch(config.ownerId);
-      if (u) return u.username;
-    }
-  } catch { /* ignore */ }
-  return client?.user?.username || 'Pixel';
+function ownerName(client) {
+  return responseBuilder.getDeveloperName(client);
 }
 
 function footerWith(text, iconURL) {
@@ -80,5 +65,6 @@ module.exports = {
   COLORS,
   AttachmentBuilder,
   EmbedBuilder,
+  ...responseBuilder,
 };
 

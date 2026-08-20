@@ -92,11 +92,30 @@ async function safeDeferUpdate(interaction) {
   }
 }
 
+async function safeUpdate(interaction, options) {
+  if (!interaction) return null;
+  try {
+    if (typeof interaction.update === 'function' && !interaction.replied && !interaction.deferred) {
+      return await interaction.update(options);
+    }
+    if (interaction.deferred || interaction.replied) {
+      return await interaction.editReply(options);
+    }
+    return await interaction.reply(options);
+  } catch (err) {
+    if (!isIgnorableError(err)) {
+      logger.debug('[interactionHelper] safeUpdate error:', err.message);
+    }
+    return null;
+  }
+}
+
 module.exports = {
   safeReply,
   safeEditReply,
   safeFollowUp,
   safeDeferReply,
   safeDeferUpdate,
+  safeUpdate,
   isIgnorableError,
 };
