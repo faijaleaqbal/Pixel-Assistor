@@ -3,7 +3,6 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { PermissionsBitField } = require('discord.js');
 const purgeCmd = require('../commands/moderation/purge');
 
 function createMockMessage(id, createdTimestamp, isBot = false, authorId = 'user1') {
@@ -64,7 +63,7 @@ function createMockChannel(messagesList = []) {
         };
       },
     },
-    bulkDelete: async (deletable, filterOld) => {
+    bulkDelete: async (deletable, _filterOld) => {
       const arr = Array.isArray(deletable) ? deletable : Array.from(deletable.values ? deletable.values() : deletable);
       const toDeleteIds = new Set(arr.map((m) => m.id));
       const deleted = msgs.filter((m) => toDeleteIds.has(m.id));
@@ -83,7 +82,7 @@ function createMockChannel(messagesList = []) {
     },
     permissionsFor: (member) => {
       return {
-        has: (perm) => {
+        has: (_perm) => {
           if (member?.lacksPerms) return false;
           return true;
         },

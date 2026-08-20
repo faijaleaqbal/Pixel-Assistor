@@ -2,7 +2,7 @@
 // Show detailed information about a role.
 // Supports both @role mention and raw role ID.
 
-const { EmbedBuilder, PermissionsBitField } = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
 const config = require('../../utils/config');
 const { resolveRoleArg } = require('../../utils/resolveRole');
 
@@ -16,7 +16,7 @@ module.exports = {
   args: true,
   async execute(message, args) {
     const role = await resolveRoleArg(message, args[0]);
-    if (!role) return; // error already replied
+    if (!role) return;
 
     const members = role.members.size;
     const perms = role.permissions.toArray();

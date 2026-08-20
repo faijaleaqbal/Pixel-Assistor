@@ -7,7 +7,7 @@ const logger = require('../utils/logger');
 
 module.exports = {
   name: 'guildMemberAdd',
-  async execute(member, client) {
+  async execute(member) {
     try {
       const db = getDb();
 

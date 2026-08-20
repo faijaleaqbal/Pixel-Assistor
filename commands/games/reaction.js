@@ -5,7 +5,6 @@
 // Persistence: reactionStat table (wins per guild).
 
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
-const config = require('../../utils/config');
 const { getDb } = require('../../utils/db');
 
 const EMOJIS = ['🎯', '🔥', '⚡', '🌟', '💎', '🚀'];
@@ -17,7 +16,7 @@ module.exports = {
   description: 'Reaction speed game — first to react wins!',
   usage: '',
   cooldown: 5,
-  async execute(message, args, client) {
+  async execute(message) {
     const targetEmoji = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
     const waitMs = 2000 + Math.floor(Math.random() * 5000);
 
@@ -68,8 +67,6 @@ module.exports = {
     if (typeof waitHandle.unref === 'function') waitHandle.unref();
   },
 
-  // Reserved for future inline-button handlers; the actual logic uses a per-message
-  // collector above. Required by interactionCreate routing.
   async handleButton(interaction) {
     if (!interaction.replied) await interaction.deferUpdate().catch(() => {});
   },

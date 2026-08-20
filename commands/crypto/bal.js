@@ -39,7 +39,7 @@ const {
   getUsdPrice,
 } = require('../../utils/cryptoApi');
 
-const PURPLE = 0x5865F2, GREEN = 0x57F287, RED = 0xED4245, YELLOW = 0xFEE75C, ORANGE = 0xE67E22;
+const PURPLE = 0x5865F2, GREEN = 0x57F287, RED = 0xED4245, YELLOW = 0xFEE75C;
 
 // messageId -> { address, kind: 'bal' }
 const state = new Map();
@@ -200,7 +200,7 @@ module.exports = {
   },
 
   // Called from interactionCreate when the user picks a network.
-  async handleInteraction(interaction, client) {
+  async handleInteraction(interaction, _client) {
     try {
       if (!interaction.isStringSelectMenu() || interaction.customId !== 'bal_network_select') return;
       const st = state.get(interaction.message.id);

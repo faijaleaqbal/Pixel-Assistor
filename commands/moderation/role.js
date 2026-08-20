@@ -5,8 +5,8 @@
 const { EmbedBuilder } = require('discord.js');
 const ms = require('../../utils/ms');
 const { resolveMemberArg } = require('../../utils/resolveUser');
+const { canManageRole, canManageMember } = require('../../utils/perms');
 
-// Single shared duration regex — same as utils/ms.js. Delegates parsing to ms.parse.
 const DURATION_RE = ms.DURATION_RE;
 
 function parseDuration(str) {
@@ -15,7 +15,13 @@ function parseDuration(str) {
 }
 
 function resolveRole(message, input) {
-  return message.mentions.roles.first() || message.guild.roles.cache.find(r => r.id === input || r.name.toLowerCase() === input.toLowerCase());
+  if (!input) return null;
+  return (
+    message.mentions.roles.first() ||
+    message.guild.roles.cache.find(
+      (r) => r.id === input || r.name.toLowerCase() === input.toLowerCase() || `<@&${r.id}>` === input
+    )
+  );
 }
 
 // Track active batch operations: guildId -> { collector, message, role, type }
@@ -37,10 +43,10 @@ module.exports = {
     if (sub === 'all') {
       const role = resolveRole(message, args[1]);
       if (!role) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Mention a role or provide its name/ID.')] });
-      if (role.position >= message.guild.members.me.roles.highest.position) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('That role is above my highest role.')] });
+      const roleCheck = canManageRole(message.member, role, message.guild, { actionName: 'assign' });
+      if (!roleCheck.ok) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`❌ ${roleCheck.error}`)] });
 
-      // Fetch ALL members so we don't miss uncached / inactive ones.
-      try { await message.guild.members.fetch(); } catch { /* ignore — proceed with cache */ }
+      try { await message.guild.members.fetch(); } catch { /* ignore */ }
       const humans = message.guild.members.cache.filter(m => !m.user.bot && !m.roles.cache.has(role.id));
       if (!humans.size) return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('All human members already have this role.')] });
 
@@ -54,7 +60,7 @@ module.exports = {
         for (const [, m] of humans) {
           try { await m.roles.add(role); count++; } catch { /* skip */ }
         }
-        await confirm.edit({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`\u2705 Added ${role} to ${count} member(s).`)] });
+        await confirm.edit({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Added ${role} to ${count} member(s).`)] });
         activeBatches.delete(message.guild.id);
       });
       collector.on('end', (collected, reason) => {
@@ -70,7 +76,8 @@ module.exports = {
     if (sub === 'bots') {
       const role = resolveRole(message, args[1]);
       if (!role) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Mention a role or provide its name/ID.')] });
-      if (role.position >= message.guild.members.me.roles.highest.position) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('That role is above my highest role.')] });
+      const roleCheck = canManageRole(message.member, role, message.guild, { actionName: 'assign' });
+      if (!roleCheck.ok) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`❌ ${roleCheck.error}`)] });
 
       try { await message.guild.members.fetch(); } catch { /* ignore */ }
       const bots = message.guild.members.cache.filter(m => m.user.bot && !m.roles.cache.has(role.id));
@@ -80,14 +87,15 @@ module.exports = {
       for (const [, m] of bots) {
         try { await m.roles.add(role); count++; } catch { /* skip */ }
       }
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`\u2705 Added ${role} to ${count} bot(s).`)] });
+      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Added ${role} to ${count} bot(s).`)] });
     }
 
-    // ── ?role humans <@role> ── (same as all)
+    // ── ?role humans <@role> ──
     if (sub === 'humans') {
       const role = resolveRole(message, args[1]);
       if (!role) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Mention a role or provide its name/ID.')] });
-      if (role.position >= message.guild.members.me.roles.highest.position) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('That role is above my highest role.')] });
+      const roleCheck = canManageRole(message.member, role, message.guild, { actionName: 'assign' });
+      if (!roleCheck.ok) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`❌ ${roleCheck.error}`)] });
 
       try { await message.guild.members.fetch(); } catch { /* ignore */ }
       const humans = message.guild.members.cache.filter(m => !m.user.bot && !m.roles.cache.has(role.id));
@@ -97,7 +105,7 @@ module.exports = {
       for (const [, m] of humans) {
         try { await m.roles.add(role); count++; } catch { /* skip */ }
       }
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`\u2705 Added ${role} to ${count} member(s).`)] });
+      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Added ${role} to ${count} member(s).`)] });
     }
 
     // ── ?role create <name> [color] ──
@@ -105,13 +113,13 @@ module.exports = {
       const name = args.slice(1).find(a => !a.match(/^#[0-9a-f]{6}$/i));
       const colorInput = args.slice(1).find(a => a.match(/^#[0-9a-f]{6}$/i));
       if (!name) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Provide a role name.')] });
-      const options = { name, reason: 'Created via ?role create' };
+      const options = { name, reason: `Created by ${message.author.tag} via ?role create` };
       if (colorInput) options.color = colorInput;
       try {
         const role = await message.guild.roles.create(options);
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`\u2705 Role ${role} created.`)] });
-      } catch {
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Failed to create role.')] });
+        return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Role ${role} created.`)] });
+      } catch (e) {
+        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`Failed to create role: ${e.message}`)] });
       }
     }
 
@@ -119,12 +127,13 @@ module.exports = {
     if (sub === 'delete') {
       const role = resolveRole(message, args[1]);
       if (!role) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Mention a role or provide its name/ID.')] });
-      if (role.position >= message.guild.members.me.roles.highest.position) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('That role is above my highest role.')] });
+      const roleCheck = canManageRole(message.member, role, message.guild, { actionName: 'delete' });
+      if (!roleCheck.ok) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`❌ ${roleCheck.error}`)] });
       try {
-        await role.delete('Deleted via ?role delete');
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`\u2705 Role \`${role.name}\` deleted.`)] });
-      } catch {
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Failed to delete role.')] });
+        await role.delete(`Deleted by ${message.author.tag} via ?role delete`);
+        return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Role \`${role.name}\` deleted.`)] });
+      } catch (e) {
+        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`Failed to delete role: ${e.message}`)] });
       }
     }
 
@@ -134,12 +143,13 @@ module.exports = {
       if (!role) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Mention a role or provide its name/ID.')] });
       const newName = args.slice(2).join(' ');
       if (!newName) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Provide a new name.')] });
-      if (role.position >= message.guild.members.me.roles.highest.position) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('That role is above my highest role.')] });
+      const roleCheck = canManageRole(message.member, role, message.guild, { actionName: 'rename' });
+      if (!roleCheck.ok) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`❌ ${roleCheck.error}`)] });
       try {
-        await role.setName(newName, 'Renamed via ?role rename');
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`\u2705 Role renamed to ${role}.`)] });
-      } catch {
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Failed to rename role.')] });
+        await role.setName(newName, `Renamed by ${message.author.tag} via ?role rename`);
+        return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Role renamed to ${role}.`)] });
+      } catch (e) {
+        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`Failed to rename role: ${e.message}`)] });
       }
     }
 
@@ -147,23 +157,29 @@ module.exports = {
     if (sub === 'temp') {
       const target = await resolveMemberArg(message, args[1]);
       if (!target) return;
-      const role = message.mentions.roles.first();
-      if (!role) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Mention a role.')] });
-      if (role.position >= message.guild.members.me.roles.highest.position) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('That role is above my highest role.')] });
+      const targetCheck = canManageMember(message.member, target, message.guild, { actionName: 'modify roles on' });
+      if (!targetCheck.ok) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`❌ ${targetCheck.error}`)] });
+
+      const role = resolveRole(message, args[2]);
+      if (!role) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Mention a role or provide its name/ID.')] });
+      const roleCheck = canManageRole(message.member, role, message.guild, { actionName: 'temporarily assign' });
+      if (!roleCheck.ok) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`❌ ${roleCheck.error}`)] });
+
       const durationStr = args.find(a => DURATION_RE.test(a));
       if (!durationStr) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Provide a duration (e.g. 10m, 1h, 1d).')] });
       const durMs = parseDuration(durationStr);
       if (!durMs) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Invalid duration format.')] });
       if (durMs > 7 * 86400000) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Maximum duration is 7 days.')] });
+
       try {
-        await target.roles.add(role);
+        await target.roles.add(role, `Temporary role added by ${message.author.tag} for ${durationStr}`);
         const tempHandle = setTimeout(async () => {
-          try { await target.roles.remove(role); } catch { /* role may have been removed */ }
+          try { await target.roles.remove(role, 'Temporary role expired'); } catch { /* role may have been removed */ }
         }, durMs);
         if (typeof tempHandle.unref === 'function') tempHandle.unref();
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`\u2705 Added ${role} to ${target.user.tag} for \`${durationStr}\`.`)] });
-      } catch {
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Failed to add role.')] });
+        return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Added ${role} to ${target.user.tag} for \`${durationStr}\`.`)] });
+      } catch (e) {
+        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`Failed to add role: ${e.message}`)] });
       }
     }
 
@@ -174,7 +190,7 @@ module.exports = {
       batch.collector.stop('cancelled');
       batch.message.edit({ embeds: [new EmbedBuilder().setColor(0x99AAB5).setDescription('Batch operation cancelled.')] }).catch(() => {});
       activeBatches.delete(message.guild.id);
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription('\u2705 Batch cancelled.')] });
+      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription('✅ Batch cancelled.')] });
     }
 
     // ── ?role status ──
@@ -187,6 +203,9 @@ module.exports = {
     // ── Original single-user toggle behavior ──
     const target = await resolveMemberArg(message, args[0]);
     if (!target) return;
+    const targetCheck = canManageMember(message.member, target, message.guild, { actionName: 'modify roles on' });
+    if (!targetCheck.ok) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`❌ ${targetCheck.error}`)] });
+
     const raw = args.slice(1).join(' ');
     const roleInputs = raw.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 5);
     if (!roleInputs.length) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Provide up to 5 roles (comma-separated).')] });
@@ -196,18 +215,19 @@ module.exports = {
       const role = message.guild.roles.cache.find(
         (r) => r.id === input || r.name.toLowerCase() === input.toLowerCase() || `<@&${r.id}>` === input
       );
-      if (!role) { results.push(`\u274C ${input} — not found`); continue; }
-      if (role.position >= message.guild.members.me.roles.highest.position) {
-        results.push(`\u274C ${role.name} — too high in hierarchy`);
+      if (!role) { results.push(`❌ \`${input}\` — not found`); continue; }
+      const roleCheck = canManageRole(message.member, role, message.guild, { actionName: 'toggle' });
+      if (!roleCheck.ok) {
+        results.push(`❌ \`${role.name}\` — ${roleCheck.error}`);
         continue;
       }
       const has = target.roles.cache.has(role.id);
       if (has) {
-        try { await target.roles.remove(role); results.push(`\u2796 ${role.name}`); }
-        catch { results.push(`\u274C ${role.name} — failed to remove`); }
+        try { await target.roles.remove(role, `Toggled off by ${message.author.tag}`); results.push(`➖ ${role.name}`); }
+        catch { results.push(`❌ ${role.name} — failed to remove`); }
       } else {
-        try { await target.roles.add(role); results.push(`\u2795 ${role.name}`); }
-        catch { results.push(`\u274C ${role.name} — failed to add`); }
+        try { await target.roles.add(role, `Toggled on by ${message.author.tag}`); results.push(`➕ ${role.name}`); }
+        catch { results.push(`❌ ${role.name} — failed to add`); }
       }
     }
     return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setTitle('Roles updated').setDescription(results.join('\n'))] });

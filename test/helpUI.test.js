@@ -7,7 +7,6 @@ const assert = require('node:assert/strict');
 const helpCmd = require('../commands/utility/help');
 const meta = require('../utils/commandMeta');
 const commandHandler = require('../handlers/commandHandler');
-const { DISPLAY, EMOJI } = require('../utils/categories');
 
 describe('Help UI Redesign (Rainy Assistant Style)', () => {
   before(() => {

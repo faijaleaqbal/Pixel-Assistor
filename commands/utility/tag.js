@@ -3,7 +3,6 @@
 
 const { EmbedBuilder } = require('discord.js');
 const { getDb } = require('../../utils/db');
-const config = require('../../utils/config');
 
 module.exports = {
   name: 'tag',

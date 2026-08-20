@@ -102,7 +102,7 @@ async function flushBatch() {
       const price = entry ? entry.usd : null;
       batch[id].resolve(price);
     }
-  } catch (err) {
+  } catch {
     for (const id of ids) {
       batch[id].resolve(null);
     }

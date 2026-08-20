@@ -2,6 +2,7 @@
 // Check if a Discord vanity URL is available.
 
 const { EmbedBuilder } = require('discord.js');
+const { request } = require('../../utils/http');
 
 module.exports = {
   name: 'checkvanity',
@@ -15,7 +16,13 @@ module.exports = {
 
     try {
       const encoded = encodeURIComponent(name);
-      const res = await fetch(`https://discord.gg/${encoded}`, { redirect: 'manual' });
+      const res = await request(`https://discord.gg/${encoded}`, {
+        method: 'GET',
+        redirect: 'manual',
+        timeout: 5000,
+        validateStatus: false,
+        label: 'Discord Vanity Check',
+      });
       const taken = res.status !== 404;
 
       const embed = new EmbedBuilder()
@@ -28,12 +35,14 @@ module.exports = {
         .setTimestamp();
 
       return message.reply({ embeds: [embed] });
-    } catch (err) {
-      return message.reply({ embeds: [new EmbedBuilder()
-        .setColor(0xED4245)
-        .setTitle('❌ Error')
-        .setDescription('Failed to check vanity URL.')
-        .setTimestamp()] });
+    } catch {
+      return message.reply({
+        embeds: [new EmbedBuilder()
+          .setColor(0xED4245)
+          .setTitle('❌ Error')
+          .setDescription('Failed to check vanity URL. Please try again.')
+          .setTimestamp()],
+      });
     }
   },
 };

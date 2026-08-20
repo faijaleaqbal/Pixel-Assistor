@@ -12,7 +12,6 @@ const banCmd = require('../commands/moderation/ban');
 const kickCmd = require('../commands/moderation/kick');
 const muteCmd = require('../commands/moderation/mute');
 const timeoutCmd = require('../commands/moderation/timeout');
-const antinukeCmd = require('../commands/admin/antinuke');
 const { isExempt, punish } = require('../events/antinukeHelpers');
 
 describe('Command Registry & Smoke Tests', () => {
@@ -199,7 +198,7 @@ describe('High-Risk Moderation Commands Security & Hierarchy', () => {
 
     // 4. Try to ban higher member
     await banCmd.execute(mockMsg, [HIGHER_ID]);
-    assert.match(replied.embeds[0].data.description, /equal or higher role/);
+    assert.match(replied.embeds[0].data.description, /equal to or higher/);
   });
 
   it('Kick: blocks kicking server owner, self, bot, and higher-ranked members', async () => {

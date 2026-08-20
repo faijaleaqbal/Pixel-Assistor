@@ -1,7 +1,7 @@
 // src/handlers/commandHandler.js
-// Dynamic file-based command loader. Scans /commands/<category>/*.js, requires each,
-// validates structure, and registers commands + aliases safely.
-// Fails startup if any command is broken or duplicates are found.
+// Production-grade dynamic command registry and loader.
+// Scans /commands/<category>/*.js, validates structure, registers commands + aliases safely.
+// Fails startup loudly if any command is broken, metadata is invalid, or collisions are found.
 
 const fs = require('fs');
 const path = require('path');
@@ -41,8 +41,22 @@ function load(client) {
         delete require.cache[require.resolve(fp)];
         const cmd = require(fp);
 
-        if (!cmd || !cmd.name || typeof cmd.execute !== 'function') {
-          const err = `Invalid command file "${fp}": must export "name" and an "execute()" function.`;
+        if (!cmd || typeof cmd !== 'object') {
+          const err = `Command file "${fp}" must export an object.`;
+          loadErrors.push(err);
+          logger.error(err);
+          continue;
+        }
+
+        if (!cmd.name || typeof cmd.name !== 'string' || !cmd.name.trim()) {
+          const err = `Invalid command file "${fp}": missing valid "name" property.`;
+          loadErrors.push(err);
+          logger.error(err);
+          continue;
+        }
+
+        if (typeof cmd.execute !== 'function') {
+          const err = `Invalid command file "${fp}": missing "execute()" function.`;
           loadErrors.push(err);
           logger.error(err);
           continue;
@@ -62,7 +76,7 @@ function load(client) {
 
         commands.set(cmdName, cmd);
 
-        // Register metadata for the help command and slash syncing.
+        // Register metadata
         meta.register(cmd.name, {
           category: cmd.category,
           description: cmd.description || 'No description provided.',
@@ -71,7 +85,7 @@ function load(client) {
           cooldown: cmd.cooldown,
           permissions: cmd.permissions || [],
           ownerOnly: !!cmd.ownerOnly,
-          args: cmd.args || false,
+          args: !!cmd.args,
           slash: !!cmd.slash,
           slashOptions: cmd.slashOptions || [],
         });
@@ -115,7 +129,10 @@ function load(client) {
   }
 
   logger.success(`Loaded ${totalLoaded} commands across ${meta.getCategories().length} categories.`);
-  if (client) client.commands = commands;
+  if (client) {
+    client.commands = commands;
+    client.aliases = aliases;
+  }
   return commands;
 }
 

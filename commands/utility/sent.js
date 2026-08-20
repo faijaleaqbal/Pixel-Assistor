@@ -42,7 +42,7 @@ module.exports = {
   permissions: ['ManageMessages'],
   args: true,
 
-  async execute(message, args, client) {
+  async execute(message, args) {
     if (!args.length) {
       return usageError(message, 'Missing message content to send.');
     }

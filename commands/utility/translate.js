@@ -1,8 +1,9 @@
 // src/commands/utility/translate.js
-// Translate text using Google Translate.
+// Translate text using Google Translate GTX endpoint.
 
 const { EmbedBuilder } = require('discord.js');
 const config = require('../../utils/config');
+const { getJson } = require('../../utils/http');
 
 module.exports = {
   name: 'translate',
@@ -27,17 +28,18 @@ module.exports = {
     }
 
     try {
-      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${tl}&dt=t&q=${encodeURIComponent(text)}`;
-      const res = await fetch(url);
-      const data = await res.json();
+      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(sl)}&tl=${encodeURIComponent(tl)}&dt=t&q=${encodeURIComponent(text)}`;
+      const data = await getJson(url, { timeout: 7000, label: 'Google Translate' });
+      if (!Array.isArray(data) || !data[0]) throw new Error('Invalid response from translation service');
+
       const translated = data[0].map((part) => part[0]).join('');
-      const detectedLang = data[2];
+      const detectedLang = data[2] || sl;
 
       const embed = new EmbedBuilder()
         .setColor(config.embedColor)
         .setTitle('🌍 Translation')
         .addFields(
-          { name: 'Detected / Source', value: detectedLang || sl, inline: true },
+          { name: 'Source / Detected', value: detectedLang, inline: true },
           { name: 'Target', value: tl, inline: true },
           { name: 'Original', value: text.slice(0, 1024), inline: false },
           { name: 'Translated', value: translated.slice(0, 1024), inline: false },
@@ -45,12 +47,14 @@ module.exports = {
         .setTimestamp();
 
       return message.reply({ embeds: [embed] });
-    } catch (err) {
-      return message.reply({ embeds: [new EmbedBuilder()
-        .setColor(0xED4245)
-        .setTitle('❌ Translation Failed')
-        .setDescription('Could not translate the provided text.')
-        .setTimestamp()] });
+    } catch {
+      return message.reply({
+        embeds: [new EmbedBuilder()
+          .setColor(0xED4245)
+          .setTitle('❌ Translation Failed')
+          .setDescription('Could not translate the provided text. Please try again.')
+          .setTimestamp()],
+      });
     }
   },
 };

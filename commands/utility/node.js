@@ -19,7 +19,7 @@ module.exports = {
     const secs = Math.floor(uptime % 60);
 
     const embed = new EmbedBuilder()
-      .setColor(0x5865F2)
+      .setColor(config.embedColor || 0x5865F2)
       .setTitle('🟢 Node.js Info')
       .addFields(
         { name: 'Version', value: process.version, inline: true },

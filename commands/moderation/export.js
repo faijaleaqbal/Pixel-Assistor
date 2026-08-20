@@ -7,7 +7,7 @@
 //
 // Permissions: ManageMessages (staff-only).
 
-const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
 const discordTranscripts = require('discord-html-transcripts');
 const { sendTempReply } = require('../../utils/tempReply');
 
@@ -15,7 +15,7 @@ module.exports = {
   name: 'export',
   category: 'moderation',
   aliases: ['exp'],
-  description: 'Export this channel\'s transcript and DM it to you.',
+  description: "Export this channel's transcript and DM it to you.",
   usage: '[count]',
   cooldown: 5,
   permissions: ['ManageMessages'],
@@ -92,7 +92,7 @@ module.exports = {
           '✅ Transcript sent to your DMs.'
         )],
       });
-    } catch (e) {
+    } catch {
       // DMs likely closed
       return sendTempReply(message, {
         embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(

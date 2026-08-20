@@ -15,6 +15,7 @@
 
 const { EmbedBuilder } = require('discord.js');
 const { getDb } = require('../../utils/db');
+const { canManageRole } = require('../../utils/perms');
 
 module.exports = {
   name: 'autorole',
@@ -53,7 +54,6 @@ module.exports = {
         await db.guildConfig.set(message.guild.id, { autoRoleId: null });
         return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription('✅ Human auto-role cleared.')] });
       }
-      // reset or reset all
       await db.guildConfig.set(message.guild.id, { autoRoleId: null, autoRoleBot: null });
       return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription('✅ All auto-roles cleared.')] });
     }
@@ -66,8 +66,9 @@ module.exports = {
         const input = args.slice(2).join(' ');
         const role = message.mentions.roles.first() || message.guild.roles.cache.find(r => r.name.toLowerCase() === input.toLowerCase()) || message.guild.roles.cache.get(input);
         if (!role) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Mention a role, or provide its name/ID.')] });
-        if (role.position >= message.guild.members.me.roles.highest.position) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('That role is above my highest role.')] });
-        if (role.managed) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Bot/managed roles cannot be used as auto-roles.')] });
+        const check = canManageRole(message.member, role, message.guild, { actionName: 'configure as auto-role' });
+        if (!check.ok) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`❌ ${check.error}`)] });
+
         await db.guildConfig.set(message.guild.id, { autoRoleBot: role.id });
         return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Bot auto-role set to ${role}.`)] });
       }
@@ -77,7 +78,6 @@ module.exports = {
         return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription('✅ Bot auto-role removed.')] });
       }
 
-      // ?autorole bots -> show
       const gCfg = await db.guildConfig.get(message.guild.id);
       if (!gCfg?.autoRoleBot) return message.reply({ embeds: [new EmbedBuilder().setColor(0x5865F2).setDescription('No bot auto-role is configured.')] });
       const role = message.guild.roles.cache.get(gCfg.autoRoleBot);
@@ -96,8 +96,9 @@ module.exports = {
         const input = args.slice(2).join(' ');
         const role = message.mentions.roles.first() || message.guild.roles.cache.find(r => r.name.toLowerCase() === input.toLowerCase()) || message.guild.roles.cache.get(input);
         if (!role) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Mention a role, or provide its name/ID.')] });
-        if (role.position >= message.guild.members.me.roles.highest.position) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('That role is above my highest role.')] });
-        if (role.managed) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Bot/managed roles cannot be used as auto-roles.')] });
+        const check = canManageRole(message.member, role, message.guild, { actionName: 'configure as auto-role' });
+        if (!check.ok) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`❌ ${check.error}`)] });
+
         await db.guildConfig.set(message.guild.id, { autoRoleId: role.id });
         return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Human auto-role set to ${role}.`)] });
       }
@@ -107,7 +108,6 @@ module.exports = {
         return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription('✅ Human auto-role removed.')] });
       }
 
-      // ?autorole humans -> show
       const gCfg = await db.guildConfig.get(message.guild.id);
       if (!gCfg?.autoRoleId) return message.reply({ embeds: [new EmbedBuilder().setColor(0x5865F2).setDescription('No human auto-role is configured. Use `?autorole set <role>` to set one.')] });
       const role = message.guild.roles.cache.get(gCfg.autoRoleId);
@@ -118,24 +118,25 @@ module.exports = {
       return message.reply({ embeds: [new EmbedBuilder().setColor(0x5865F2).setTitle('👤 Human Auto-Role').setDescription(`Current human auto-role: ${role}`)] });
     }
 
-    // ── ?autorole set <@role> (original behavior) ──
+    // ── ?autorole set <@role> ──
     if (action === 'set') {
       const input = args.slice(1).join(' ');
       const role = message.mentions.roles.first() || message.guild.roles.cache.find(r => r.name.toLowerCase() === input.toLowerCase()) || message.guild.roles.cache.get(input);
       if (!role) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Mention a role, or provide its name/ID.')] });
-      if (role.position >= message.guild.members.me.roles.highest.position) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('That role is above my highest role — I cannot assign it.')] });
-      if (role.managed) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Bot/managed roles cannot be used as auto-roles.')] });
+      const check = canManageRole(message.member, role, message.guild, { actionName: 'configure as auto-role' });
+      if (!check.ok) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`❌ ${check.error}`)] });
+
       await db.guildConfig.set(message.guild.id, { autoRoleId: role.id });
       return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Auto-role set to ${role}. New members will receive it on join.`)] });
     }
 
-    // ── ?autorole remove/clear/off (original behavior) ──
+    // ── ?autorole remove/clear/off ──
     if (action === 'remove' || action === 'clear' || action === 'off') {
       await db.guildConfig.set(message.guild.id, { autoRoleId: null });
       return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription('✅ Auto-role has been removed.')] });
     }
 
-    // ── ?autorole (no args) -> show current human auto-role ──
+    // ── ?autorole (no args) ──
     const gCfg = await db.guildConfig.get(message.guild.id);
     if (!gCfg?.autoRoleId) return message.reply({ embeds: [new EmbedBuilder().setColor(0x5865F2).setDescription('No auto-role is configured. Use `?autorole set <role>` to set one.')] });
     const role = message.guild.roles.cache.get(gCfg.autoRoleId);

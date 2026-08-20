@@ -2,10 +2,8 @@
 // Fetches real recent transactions from mainnets and runs them through our parsers.
 
 const { parseTransaction } = require('../utils/crypto');
-const { EVMTransactionParser, callRpc } = require('../utils/crypto/parsers/evmParser');
-const { LitecoinTransactionParser } = require('../utils/crypto/parsers/litecoinParser');
-const { SolanaTransactionParser, callSolanaRpc } = require('../utils/crypto/parsers/solanaParser');
-const { buildTransactionEmbed } = require('../utils/crypto/embedFormatter');
+const { callRpc } = require('../utils/crypto/parsers/evmParser');
+const { callSolanaRpc } = require('../utils/crypto/parsers/solanaParser');
 
 async function testPolygonLive() {
   console.log('--- Testing Polygon Live ---');

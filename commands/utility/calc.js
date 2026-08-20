@@ -1,8 +1,9 @@
 // src/commands/utility/calc.js
-// Safe arithmetic calculator. Supports + - * / % ( ) and decimals.
+// Safe arithmetic calculator. Evaluates math expressions deterministically without eval.
 
 const { EmbedBuilder, ApplicationCommandOptionType } = require('discord.js');
 const config = require('../../utils/config');
+const { evaluate } = require('../../utils/mathEval');
 
 module.exports = {
   name: 'calc',
@@ -34,13 +35,8 @@ module.exports = {
 };
 
 function evaluateMath(expr) {
-  if (!/^[\d+\-*/%().\s]+$/.test(expr)) {
-    return new EmbedBuilder().setColor(0xED4245).setDescription('❌ Only digits, `+ - * / % ( )` and spaces are allowed.');
-  }
   try {
-    // eslint-disable-next-line no-new-func
-    const result = Function(`"use strict"; return (${expr});`)();
-    if (typeof result !== 'number' || !isFinite(result)) throw new Error('Not a finite number');
+    const result = evaluate(expr);
     return new EmbedBuilder()
       .setColor(config.embedColor)
       .setTitle('🧮 Calculator')
@@ -53,4 +49,3 @@ function evaluateMath(expr) {
     return new EmbedBuilder().setColor(0xED4245).setDescription(`❌ Invalid expression: ${e.message}`);
   }
 }
-

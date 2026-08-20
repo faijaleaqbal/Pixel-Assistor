@@ -289,7 +289,6 @@ function buildHomeEmbed(client, prefix, user) {
  */
 function buildCategoryEmbed(client, cat, page, totalPages, prefix) {
   const cmds = meta.byCategory(cat).sort((a, b) => a.name.localeCompare(b.name));
-  const total = cmds.length;
   const safePage = Math.min(Math.max(0, page), totalPages - 1);
   const start = safePage * COMMANDS_PER_PAGE;
   const slice = cmds.slice(start, start + COMMANDS_PER_PAGE);

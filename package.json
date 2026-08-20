@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
-    "test": "node --test test/cryptoParser.test.js test/helpUI.test.js test/purgeCommand.test.js test/commandRegistrySmoke.test.js",
+    "test": "node --test test/*.test.js",
+    "lint": "eslint .",
     "test:live": "node test/fetchAndSmokeTest.js",
     "pm2:start": "pm2 start ecosystem.config.js",
     "pm2:restart": "pm2 restart pixel-bot",
@@ -19,7 +20,7 @@
   },
   "dependencies": {
     "better-sqlite3": "^11.3.0",
-    "discord-html-transcripts": "^3.2.0",
+    "discord-html-transcripts": "3.2.0",
     "discord.js": "^14.16.3",
     "dotenv": "^16.4.5",
     "mongoose": "^8.6.0",
@@ -27,6 +28,9 @@
   },
   "devDependencies": {
     "eslint": "^9.10.0"
+  },
+  "overrides": {
+    "undici": "^6.21.1"
   },
   "allowScripts": {
     "better-sqlite3@11.10.0": true

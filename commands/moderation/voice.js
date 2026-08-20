@@ -2,9 +2,9 @@
 // Voice channel management. 17 subcommands.
 // All require MoveMembers except `voice request`. Accepts @user or raw userID everywhere.
 
-const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
-const { hasPermission } = require('../../utils/perms');
+const { EmbedBuilder } = require('discord.js');
 const { resolveMemberArg } = require('../../utils/resolveUser');
+const { canManageMember } = require('../../utils/perms');
 
 function needVoice(message) {
   if (!message.member.voice.channel) {
@@ -14,10 +14,15 @@ function needVoice(message) {
   return true;
 }
 
-async function needTarget(message, args) {
-  // arg[1] is the user-arg position after the subcommand
+async function needTarget(message, args, actionName = 'moderate') {
   const target = await resolveMemberArg(message, args[1]);
-  return target; // null already replied by resolver
+  if (!target) return null;
+  const check = canManageMember(message.member, target, message.guild, { actionName: `voice-${actionName}` });
+  if (!check.ok) {
+    message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`❌ ${check.error}`)] });
+    return null;
+  }
+  return target;
 }
 
 function getMyChannel(message) {
@@ -42,7 +47,7 @@ module.exports = {
     // ── kick ──
     if (sub === 'kick') {
       if (!needVoice(message)) return;
-      const target = await needTarget(message, args);
+      const target = await needTarget(message, args, 'kick');
       if (!target) return;
       try {
         await target.voice.disconnect('Voice kick by ' + message.author.tag);
@@ -56,7 +61,7 @@ module.exports = {
     if (sub === 'kickall') {
       if (!needVoice(message)) return;
       const vc = getMyChannel(message);
-      const members = vc.members.filter(m => !m.user.bot);
+      const members = vc.members.filter(m => !m.user.bot && m.id !== message.author.id);
       if (!members.size) return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('No users to kick.')] });
       let count = 0;
       for (const [, m] of members) {
@@ -68,7 +73,7 @@ module.exports = {
     // ── mute ──
     if (sub === 'mute') {
       if (!needVoice(message)) return;
-      const target = await needTarget(message, args);
+      const target = await needTarget(message, args, 'mute');
       if (!target) return;
       try {
         await target.voice.setMute(true);
@@ -82,7 +87,7 @@ module.exports = {
     if (sub === 'muteall') {
       if (!needVoice(message)) return;
       const vc = getMyChannel(message);
-      const members = vc.members.filter(m => !m.user.bot);
+      const members = vc.members.filter(m => !m.user.bot && m.id !== message.author.id);
       if (!members.size) return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('No users to mute.')] });
       let count = 0;
       for (const [, m] of members) {
@@ -94,7 +99,7 @@ module.exports = {
     // ── unmute ──
     if (sub === 'unmute') {
       if (!needVoice(message)) return;
-      const target = await needTarget(message, args);
+      const target = await needTarget(message, args, 'unmute');
       if (!target) return;
       try {
         await target.voice.setMute(false);
@@ -120,7 +125,7 @@ module.exports = {
     // ── deafen ──
     if (sub === 'deafen') {
       if (!needVoice(message)) return;
-      const target = await needTarget(message, args);
+      const target = await needTarget(message, args, 'deafen');
       if (!target) return;
       try {
         await target.voice.setDeaf(true);
@@ -134,7 +139,7 @@ module.exports = {
     if (sub === 'deafenall') {
       if (!needVoice(message)) return;
       const vc = getMyChannel(message);
-      const members = vc.members.filter(m => !m.user.bot);
+      const members = vc.members.filter(m => !m.user.bot && m.id !== message.author.id);
       if (!members.size) return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('No users to deafen.')] });
       let count = 0;
       for (const [, m] of members) {
@@ -146,7 +151,7 @@ module.exports = {
     // ── undeafen ──
     if (sub === 'undeafen') {
       if (!needVoice(message)) return;
-      const target = await needTarget(message, args);
+      const target = await needTarget(message, args, 'undeafen');
       if (!target) return;
       try {
         await target.voice.setDeaf(false);
@@ -172,7 +177,7 @@ module.exports = {
     // ── moveall <@user|userID> ── move all from user's voice channel to YOUR voice channel
     if (sub === 'moveall') {
       if (!needVoice(message)) return;
-      const target = await needTarget(message, args);
+      const target = await needTarget(message, args, 'move');
       if (!target) return;
       if (!target.voice.channel) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('That user is not in a voice channel.')] });
       const dest = getMyChannel(message);
@@ -188,7 +193,7 @@ module.exports = {
     // ── pull <@user|userID> ── move user to YOUR voice channel
     if (sub === 'pull') {
       if (!needVoice(message)) return;
-      const target = await needTarget(message, args);
+      const target = await needTarget(message, args, 'pull');
       if (!target) return;
       if (!target.voice.channel) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('That user is not in a voice channel.')] });
       try {
@@ -202,7 +207,7 @@ module.exports = {
     // ── pullall <@user|userID> ── move all from user's channel to yours
     if (sub === 'pullall') {
       if (!needVoice(message)) return;
-      const target = await needTarget(message, args);
+      const target = await needTarget(message, args, 'pull');
       if (!target) return;
       if (!target.voice.channel) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('That user is not in a voice channel.')] });
       const dest = getMyChannel(message);
@@ -220,9 +225,7 @@ module.exports = {
       if (!needVoice(message)) return;
       const vc = getMyChannel(message);
       try {
-        // CategoryChannel doesn't have createInvite in v14 — always use the voice channel itself.
-        const inviteChannel = vc;
-        const invite = await inviteChannel.createInvite({ maxAge: 86400, maxUses: 1, reason: 'Voice invite by ' + message.author.tag });
+        const invite = await vc.createInvite({ maxAge: 86400, maxUses: 1, reason: 'Voice invite by ' + message.author.tag });
         return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Invite created: ${invite.url}`)] });
       } catch {
         return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Failed to create invite.')] });
@@ -232,7 +235,7 @@ module.exports = {
     // ── ban <@user|userID> ── disconnect + deny Connect
     if (sub === 'ban') {
       if (!needVoice(message)) return;
-      const target = await needTarget(message, args);
+      const target = await needTarget(message, args, 'ban');
       if (!target) return;
       const vc = getMyChannel(message);
       try {

@@ -7,6 +7,7 @@
 
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const config = require('../../utils/config');
+const { getBuffer, request } = require('../../utils/http');
 
 /**
  * Fetch a Discord attachment as a raw Buffer.
@@ -14,9 +15,7 @@ const config = require('../../utils/config');
  */
 async function fetchAttachmentBuffer(url) {
   try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    return Buffer.from(await res.arrayBuffer());
+    return await getBuffer(url, { timeout: 10000, label: 'Discord Attachment' });
   } catch {
     return null;
   }
@@ -48,7 +47,7 @@ module.exports = {
   description: 'Get a shareable browser link for an HTML file.',
   usage: '(attach .html, or reply to a message with .html)',
   cooldown: 3,
-  async execute(message, args) {
+  async execute(message) {
     // ── 0. Config check ──
     if (!config.viewerBaseUrl) {
       return message.reply({
@@ -118,20 +117,17 @@ module.exports = {
     }
 
     // ── 3. POST raw buffer to the viewer service ──
-    // The viewer uses express.raw({ type: '*/*' }) — it expects a Buffer body.
     let uploadResult;
     try {
       const uploadUrl = `${config.viewerBaseUrl.replace(/\/+$/, '')}/upload`;
-      const res = await fetch(uploadUrl, {
+      const res = await request(uploadUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/octet-stream' },
         body: htmlBuffer,
+        timeout: 8000,
+        label: 'Viewer Service',
+        allowInternal: true,
       });
-
-      if (!res.ok) {
-        const errText = await res.text().catch(() => '');
-        throw new Error(`Viewer returned HTTP ${res.status}: ${errText.slice(0, 200)}`);
-      }
 
       uploadResult = await res.json();
     } catch (e) {

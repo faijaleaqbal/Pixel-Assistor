@@ -1,63 +1,81 @@
 // src/commands/moderation/owner.js
-// Server co-owner role management.
+// Configure server co-owner roles.
+// SECURITY: Restricted strictly to the Guild Owner or Bot Owners.
+// Usage: ?owner add <@role> | ?owner remove <@role> | ?owner list | ?owner clear
 
 const { EmbedBuilder } = require('discord.js');
 const { getDb } = require('../../utils/db');
-
-function parseRoles(raw) {
-  if (Array.isArray(raw)) return raw;
-  try { return JSON.parse(raw); } catch { return []; }
-}
+const { isOwner } = require('../../utils/perms');
 
 module.exports = {
   name: 'owner',
   category: 'moderation',
-  description: 'Manage co-owner roles. Usage: owner add <@role> | remove <@role> | reset | show',
-  usage: 'add <@role> | remove <@role> | reset | show',
+  description: 'Manage server co-owner roles. Only the Server Owner or Bot Owners can use this command.',
+  usage: '<add|remove|list|clear> [@role]',
   cooldown: 3,
   permissions: ['Administrator'],
+
   async execute(message, args) {
+    // Strict Owner Security Guard: Guild Owner or Bot Owner only!
+    const isGuildOwner = message.guild.ownerId === message.author.id;
+    const isBotOwner = isOwner(message.author.id);
+
+    if (!isGuildOwner && !isBotOwner) {
+      return message.reply({
+        embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('❌ Only the **Server Owner** can configure server co-owner roles.')],
+      });
+    }
+
     const db = getDb();
-    const action = args[0]?.toLowerCase();
-    const guildId = message.guild.id;
-    let cfg = await db.guildConfig.get(guildId);
-    let roles = parseRoles(cfg?.ownerRoles || '[]');
+    const gCfg = (await db.guildConfig.get(message.guild.id)) || {};
+    const sub = (args[0] || '').toLowerCase();
+    const ownerRoles = gCfg.ownerRoles || [];
 
-    // Show
-    if (action === 'show' || action === 'list' || !action) {
-      if (!roles.length) return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('No co-owner roles configured.')] });
-      const list = roles.map(id => {
+    if (!sub || sub === 'list') {
+      if (!ownerRoles.length) {
+        return message.reply({ embeds: [new EmbedBuilder().setColor(0x5865F2).setDescription('No owner roles are configured.')] });
+      }
+      const roles = ownerRoles.map((id) => {
         const r = message.guild.roles.cache.get(id);
-        return r ? r.toString() + ' `' + id + '`' : '`' + id + '` (not found)';
-      }).join('\n') || 'None found';
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x5865F2).setTitle('Co-Owner Roles').setDescription(list)] });
+        return r ? `${r} (\`${id}\`)` : `\`${id}\` (deleted)`;
+      });
+      return message.reply({
+        embeds: [new EmbedBuilder().setColor(0x5865F2).setTitle('👑 Owner Roles').setDescription(roles.join('\n'))],
+      });
     }
 
-    // Reset
-    if (action === 'reset') {
-      await db.guildConfig.set(guildId, { ownerRoles: [] });
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription('✅ Co-owner roles cleared.')] });
+    if (sub === 'add') {
+      const role = message.mentions.roles.first() || message.guild.roles.cache.get(args[1]);
+      if (!role) {
+        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Mention a role or provide a role ID.')] });
+      }
+      if (ownerRoles.includes(role.id)) {
+        return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription(`${role} is already an owner role.`)] });
+      }
+      ownerRoles.push(role.id);
+      await db.guildConfig.set(message.guild.id, { ownerRoles });
+      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Added ${role} to owner roles.`)] });
     }
 
-    // Add
-    if (action === 'add') {
-      const role = message.mentions.roles.first();
-      if (!role) return message.reply('Mention a role to add.');
-      if (roles.includes(role.id)) return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription('That role is already a co-owner role.')] });
-      roles.push(role.id);
-      await db.guildConfig.set(guildId, { ownerRoles: roles });
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription('✅ Added ' + role.toString() + ' as a co-owner role.')] });
+    if (sub === 'remove') {
+      const role = message.mentions.roles.first() || message.guild.roles.cache.get(args[1]);
+      if (!role) {
+        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Mention a role or provide a role ID.')] });
+      }
+      const idx = ownerRoles.indexOf(role.id);
+      if (idx === -1) {
+        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`${role} is not in the owner roles list.`)] });
+      }
+      ownerRoles.splice(idx, 1);
+      await db.guildConfig.set(message.guild.id, { ownerRoles });
+      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Removed ${role} from owner roles.`)] });
     }
 
-    // Remove
-    if (action === 'remove' || action === 'del') {
-      const role = message.mentions.roles.first();
-      if (!role) return message.reply('Mention a role to remove.');
-      roles = roles.filter(id => id !== role.id);
-      await db.guildConfig.set(guildId, { ownerRoles: roles });
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription('✅ Removed ' + role.toString() + ' from co-owner roles.')] });
+    if (sub === 'clear') {
+      await db.guildConfig.set(message.guild.id, { ownerRoles: [] });
+      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription('✅ Cleared all owner roles.')] });
     }
 
-    return message.reply('Usage: `owner add <@role> | remove <@role> | reset | show`');
+    return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Usage: `?owner <add|remove|list|clear> [@role]`')] });
   },
 };

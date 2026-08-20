@@ -13,6 +13,7 @@ const { EmbedBuilder } = require('discord.js');
 const { getDb } = require('../../utils/db');
 const { isOwner } = require('../../utils/perms');
 const { resolveMemberArg } = require('../../utils/resolveUser');
+const { paginate } = require('../../utils/pagination');
 
 const E = (c, d) => new EmbedBuilder().setColor(c).setDescription(d);
 
@@ -27,9 +28,6 @@ module.exports = {
   description: 'Let specific users use bot commands without the prefix. Accepts @user or raw userID.',
   usage: '<me|add|remove|list|clear> [@user|userID]',
   cooldown: 3,
-  // No permissions gate — the in-execute isAuth() check authorizes either the
-  // server owner OR the bot owner. A blanket `permissions: ['Administrator']`
-  // would block the bot owner if they don't have Administrator in the guild.
   ownerOnly: false,
   args: true,
 
@@ -49,7 +47,7 @@ module.exports = {
       if (action === 'remove' || action === 'rm' || action === 'del') {
         const ok = await db.cmdWhitelist.remove(message.author.id, message.guild.id);
         if (!ok) return message.reply({ embeds: [E(0xFEE75C, 'You are not in the command whitelist.')] });
-        return message.reply({ embeds: [E(0x57F287, `✅ You removed yourself from the command whitelist. You now need the prefix to use commands.`)] });
+        return message.reply({ embeds: [E(0x57F287, '✅ You removed yourself from the command whitelist. You now need the prefix to use commands.')] });
       }
 
       // ?wl me → add yourself
@@ -58,7 +56,7 @@ module.exports = {
       const ok = await db.cmdWhitelist.add(message.author.id, message.guild.id, message.author.id);
       if (!ok) return message.reply({ embeds: [E(0xFEE75C, 'You are already in the command whitelist. ✅')] });
 
-      return message.reply({ embeds: [E(0x57F287, `✅ You added yourself to the command whitelist. You can now use **all commands without the prefix**.`)] });
+      return message.reply({ embeds: [E(0x57F287, '✅ You added yourself to the command whitelist. You can now use **all commands without the prefix**.')] });
     }
 
     // ── add ──
@@ -66,7 +64,6 @@ module.exports = {
       const target = await resolveMemberArg(message, args[1]);
       if (!target) return;
 
-      // Don't allow adding bots
       if (target.user.bot) return message.reply({ embeds: [E(0xED4245, 'You cannot add bots to the command whitelist.')] });
 
       const ok = await db.cmdWhitelist.add(target.id, message.guild.id, message.author.id);
@@ -97,18 +94,24 @@ module.exports = {
         return `**${i + 1}.** ${tag} — added by ${addedBy} (<t:${Math.floor(r.addedAt / 1000)}:R>)`;
       });
 
-      // Discord field limit is 1024 — split if needed
       const CHUNK = 10;
       const embeds = [];
+      const totalPages = Math.ceil(list.length / CHUNK);
+
       for (let i = 0; i < list.length; i += CHUNK) {
+        const pageNum = Math.floor(i / CHUNK) + 1;
         embeds.push(new EmbedBuilder()
           .setColor(0x5865F2)
-          .setTitle(`📋 Command Whitelist${list.length > CHUNK ? ` (${Math.floor(i / CHUNK) + 1}/${Math.ceil(list.length / CHUNK)})` : ''}`)
+          .setTitle(`📋 Command Whitelist${totalPages > 1 ? ` (${pageNum}/${totalPages})` : ''}`)
           .setDescription(list.slice(i, i + CHUNK).join('\n'))
           .setFooter({ text: `${rows.length} user${rows.length > 1 ? 's' : ''} whitelisted — can use commands without prefix` })
           .setTimestamp());
       }
-      return message.reply({ embeds });
+
+      if (embeds.length === 1) {
+        return message.reply({ embeds: [embeds[0]] });
+      }
+      return paginate(message, embeds);
     }
 
     // ── clear ──
@@ -118,7 +121,6 @@ module.exports = {
       return message.reply({ embeds: [E(0x57F287, `✅ Command whitelist cleared. **${count}** user${count > 1 ? 's' : ''} removed.`)] });
     }
 
-    // Unknown subcommand
     return message.reply({ embeds: [E(0xED4245, 'Unknown sub-command. Use `me`, `add`, `remove`, `list`, or `clear`.')] });
   },
 };

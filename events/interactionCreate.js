@@ -1,82 +1,65 @@
 // src/events/interactionCreate.js
-// Handles button, select-menu, and slash command interactions.
-// Enforces permissions, ownerOnly, cooldowns, and safe error responses.
+// Production-grade interaction router for slash commands, buttons, select menus, and modals.
 
 const logger = require('../utils/logger');
-const cooldowns = require('../utils/cooldowns');
-const { hasPermission, isOwner } = require('../utils/perms');
+const { executeSlashCommand } = require('../handlers/commandPipeline');
+const { safeReply } = require('../utils/interactionHelper');
 
 module.exports = {
   name: 'interactionCreate',
   async execute(interaction, client) {
+    if (!interaction) return;
+
     try {
+      // ── 1. Slash Commands ──
       if (interaction.isChatInputCommand()) {
         const cmd = client.commands?.get(interaction.commandName);
         if (!cmd) {
-          return interaction.reply({ content: '❌ This command is no longer registered.', ephemeral: true });
-        }
-
-        // 1. Owner-only check
-        if (cmd.ownerOnly && !isOwner(interaction.user.id)) {
-          return interaction.reply({ content: '❌ This command is restricted to the bot owner.', ephemeral: true });
-        }
-
-        // 2. Permissions check
-        if (cmd.permissions && cmd.permissions.length && interaction.member) {
-          const missing = cmd.permissions.filter((p) => !hasPermission(interaction.member, p));
-          if (missing.length) {
-            return interaction.reply({
-              content: `❌ You need these permissions to use this command: \`${missing.join(', ')}\``,
-              ephemeral: true,
-            });
-          }
-        }
-
-        // 3. Cooldown check
-        const cd = cooldowns.check(cmd.name, interaction.user.id, cmd.cooldown);
-        if (cd > 0) {
-          return interaction.reply({
-            content: `⏳ Please wait **${cd}s** before using this command again.`,
+          return safeReply(interaction, {
+            content: '❌ This command is no longer registered.',
             ephemeral: true,
           });
         }
-
-        if (cmd.slashExecute) {
-          await cmd.slashExecute(interaction, client);
-        } else {
-          await interaction.reply({ content: 'ℹ️ This command is currently available via prefix.', ephemeral: true });
-        }
+        await executeSlashCommand(cmd, interaction, client);
         return;
       }
 
+      // ── 2. Button Interactions ──
       if (interaction.isButton()) {
         const id = interaction.customId;
 
-        // Help dropdown / buttons — handled centrally in help.js
+        // Help navigation
         if (id.startsWith('help_')) {
           return require('../commands/utility/help').handleInteraction(interaction, client);
         }
 
-        // Game, ticket, AFK collectors handled by per-message collectors
-        if (id.startsWith('ttt_')) return;
-        if (id.startsWith('rps_')) return;
-        if (id.startsWith('react_')) return;
-        if (id.startsWith('ticket_')) return;
-        if (id.startsWith('afk_')) return;
-        if (id.startsWith('pg_')) return;
-
-        if (id.startsWith('copy_upi_')) {
-          const upiId = id.slice('copy_upi_'.length);
-          return interaction.reply({ content: `\`${upiId}\``, ephemeral: true });
+        // Active component collectors handle these internally
+        if (
+          id.startsWith('ttt_') ||
+          id.startsWith('rps_') ||
+          id.startsWith('react_') ||
+          id.startsWith('ticket_') ||
+          id.startsWith('afk_') ||
+          id.startsWith('pg_') ||
+          id.startsWith('qr_int_')
+        ) {
+          return;
         }
 
-        // Unknown / expired buttons
+        // Copy UPI ID button
+        if (id.startsWith('copy_upi_')) {
+          const upiId = id.slice('copy_upi_'.length);
+          return safeReply(interaction, { content: `\`${upiId}\``, ephemeral: true });
+        }
+
+        // Expired/unhandled button
         if (!interaction.deferred && !interaction.replied) {
-          await interaction.reply({ content: 'ℹ️ This button interaction has expired.', ephemeral: true }).catch(() => {});
+          await safeReply(interaction, { content: 'ℹ️ This button interaction has expired.', ephemeral: true });
         }
         return;
       }
 
+      // ── 3. Select Menus ──
       if (interaction.isStringSelectMenu()) {
         if (interaction.customId === 'help_category_select') {
           return require('../commands/utility/help').handleInteraction(interaction, client);
@@ -90,6 +73,7 @@ module.exports = {
         return;
       }
 
+      // ── 4. Modal Submissions ──
       if (interaction.isModalSubmit && interaction.isModalSubmit()) {
         if (!interaction.deferred && !interaction.replied) {
           await interaction.deferUpdate().catch(() => {});
@@ -97,15 +81,13 @@ module.exports = {
         return;
       }
     } catch (e) {
-      logger.error('interactionCreate handler error', e?.stack || e?.message || e);
+      logger.error('interactionCreate router error', e?.stack || e?.message || e);
       try {
-        const userMsg = '❌ An unexpected error occurred while processing this interaction.';
-        if (interaction.deferred || interaction.replied) {
-          await interaction.editReply({ content: userMsg }).catch(() => {});
-        } else {
-          await interaction.reply({ content: userMsg, ephemeral: true }).catch(() => {});
-        }
-      } catch { /* ignore secondary delivery failure */ }
+        await safeReply(interaction, {
+          content: '❌ An unexpected error occurred while processing this interaction.',
+          ephemeral: true,
+        });
+      } catch { /* ignore secondary failure */ }
     }
   },
 };

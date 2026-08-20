@@ -7,14 +7,15 @@
 //
 // Commands just call getDb().namespace.method() — routing is handled here.
 
-const config = require('./config');
-const logger = require('./logger');
 const path = require('path');
 const fs = require('fs');
+const config = require('./config');
+const logger = require('./logger');
 
 let sql = null;
 let mongo = null;
 let unified = null;
+let rawSqliteDb = null;
 
 // ─────────────────────────────────────────────────────────────
 //  SQLite — ALL data (complete fallback)
@@ -24,10 +25,11 @@ function makeSqlite() {
   const dbFile = path.resolve(process.cwd(), config.sqlitePath || './data/bot.db');
   fs.mkdirSync(path.dirname(dbFile), { recursive: true });
   const db = new Database(dbFile);
+  rawSqliteDb = db;
   db.pragma('journal_mode = WAL');
 
   db.exec(`
-    -- Original 5 tables --
+    -- Core Tables --
     CREATE TABLE IF NOT EXISTS upi (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       userId TEXT NOT NULL,
@@ -68,7 +70,7 @@ function makeSqlite() {
       UNIQUE(guildId, type, target)
     );
 
-    -- Fallback tables for MongoDB collections --
+    -- Guild & Admin Tables --
     CREATE TABLE IF NOT EXISTS antinuke_config (
       guildId TEXT PRIMARY KEY,
       enabled INTEGER DEFAULT 0,
@@ -108,6 +110,9 @@ function makeSqlite() {
       ownerRoles TEXT DEFAULT '[]',
       autoRoleBot TEXT,
       autoRoleHuman TEXT,
+      modLimit INTEGER,
+      adminModLimit INTEGER,
+      modModLimit INTEGER,
       prefix TEXT
     );
     CREATE TABLE IF NOT EXISTS warn (
@@ -198,24 +203,36 @@ function makeSqlite() {
       generatedBy TEXT NOT NULL,
       createdAt INTEGER NOT NULL
     );
+
+    -- Performance Indexes --
+    CREATE INDEX IF NOT EXISTS idx_warn_user_guild ON warn(userId, guildId);
+    CREATE INDEX IF NOT EXISTS idx_warn_guild ON warn(guildId);
+    CREATE INDEX IF NOT EXISTS idx_tags_guild_name ON tags(guildId, name COLLATE NOCASE);
+    CREATE INDEX IF NOT EXISTS idx_user_reminder_due ON user_reminder(triggerAt, fired);
+    CREATE INDEX IF NOT EXISTS idx_user_reminder_user ON user_reminder(userId);
+    CREATE INDEX IF NOT EXISTS idx_timer_due ON timer(triggerAt, fired);
+    CREATE INDEX IF NOT EXISTS idx_scheduled_due ON scheduled_messages(triggerAt, sent);
+    CREATE INDEX IF NOT EXISTS idx_transcripts_created ON transcripts(createdAt);
   `);
 
   // Migrations
   try { db.exec('ALTER TABLE afk ADD COLUMN dmOnMention INTEGER DEFAULT 0'); } catch {}
-  // modlimit command expects modLimit / adminModLimit / modModLimit columns on guild_config.
-  // These are nullable integers — null means "not set".
   try { db.exec('ALTER TABLE guild_config ADD COLUMN modLimit INTEGER'); } catch {}
   try { db.exec('ALTER TABLE guild_config ADD COLUMN adminModLimit INTEGER'); } catch {}
   try { db.exec('ALTER TABLE guild_config ADD COLUMN modModLimit INTEGER'); } catch {}
   try { db.exec('ALTER TABLE guild_config ADD COLUMN prefix TEXT'); } catch {}
 
   // JSON helpers
-  const j = (s, fallback = []) => { try { return JSON.parse(s); } catch { return fallback; } };
+  const j = (s, fallback = []) => {
+    try {
+      return JSON.parse(s);
+    } catch {
+      return fallback;
+    }
+  };
 
   return {
-    // ═══════════════════════════════════════════
-    //  Original 5 namespaces
-    // ═══════════════════════════════════════════
+    _raw: db,
 
     // ── UPI ─────────────────────────────
     upi: {
@@ -268,13 +285,9 @@ function makeSqlite() {
       add: (guildId, type, target) =>
         db.prepare('INSERT OR IGNORE INTO ignored (guildId, type, target) VALUES (?,?,?)').run(guildId, type, target),
       remove: (guildId, type, target) => db.prepare('DELETE FROM ignored WHERE guildId=? AND type=? AND target=?').run(guildId, type, target).changes > 0,
-      list: (guildId, type) => db.prepare('SELECT target FROM ignored WHERE guildId=? AND type=?').all(guildId, type).map(r => r.target),
+      list: (guildId, type) => db.prepare('SELECT target FROM ignored WHERE guildId=? AND type=?').all(guildId, type).map((r) => r.target),
       clear: (guildId, type) => db.prepare('DELETE FROM ignored WHERE guildId=? AND type=?').run(guildId, type),
     },
-
-    // ═══════════════════════════════════════════
-    //  Fallback namespaces (mirror MongoDB collections)
-    // ═══════════════════════════════════════════
 
     // ── AntiNuke ────────────────────────
     antinuke: {
@@ -292,7 +305,6 @@ function makeSqlite() {
         };
       },
       set: (guildId, data) => {
-        // Merge with existing (commands send partial updates)
         const ex = db.prepare('SELECT * FROM antinuke_config WHERE guildId=?').get(guildId);
         const base = ex ? {
           enabled: ex.enabled === 1, logChannel: ex.logChannel,
@@ -304,8 +316,8 @@ function makeSqlite() {
           VALUES (?,?,?,?,?,?,?) ON CONFLICT(guildId) DO UPDATE SET
           enabled=excluded.enabled, logChannel=excluded.logChannel, punishment=excluded.punishment,
           owners=excluded.owners, whitelist=excluded.whitelist, wlRoles=excluded.wlRoles`)
-          .run(guildId, m.enabled?1:0, m.logChannel||null, m.punishment||'ban',
-            JSON.stringify(m.owners||[]), JSON.stringify(m.whitelist||[]), JSON.stringify(m.wlRoles||[]));
+          .run(guildId, m.enabled ? 1 : 0, m.logChannel || null, m.punishment || 'ban',
+            JSON.stringify(m.owners || []), JSON.stringify(m.whitelist || []), JSON.stringify(m.wlRoles || []));
         return m;
       },
     },
@@ -331,15 +343,16 @@ function makeSqlite() {
         };
       },
       set: (guildId, data) => {
-        // Merge with existing (commands send partial updates)
         const ex = db.prepare('SELECT * FROM greet_config WHERE guildId=?').get(guildId);
         const base = ex ? {
-          enabled: ex.enabled===1, channels: j(ex.channels),
+          enabled: ex.enabled === 1, channels: j(ex.channels),
           message: ex.message, title: ex.title, description: ex.description,
           footer: ex.footer, image: ex.image, thumbnail: ex.thumbnail,
-          embed: ex.embed===1, ping: ex.ping===1, autoDelete: ex.autoDelete||0,
-        } : { enabled: false, channels: [], message: null, title: null, description: null,
-            footer: null, image: null, thumbnail: null, embed: true, ping: true, autoDelete: 0 };
+          embed: ex.embed === 1, ping: ex.ping === 1, autoDelete: ex.autoDelete || 0,
+        } : {
+          enabled: false, channels: [], message: null, title: null, description: null,
+          footer: null, image: null, thumbnail: null, embed: true, ping: true, autoDelete: 0,
+        };
         const m = { ...base, ...data, guildId };
         db.prepare(`INSERT INTO greet_config (guildId,enabled,channels,message,title,description,footer,image,thumbnail,embed,ping,autoDelete)
           VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(guildId) DO UPDATE SET
@@ -348,17 +361,17 @@ function makeSqlite() {
           image=excluded.image, thumbnail=excluded.thumbnail, embed=excluded.embed,
           ping=excluded.ping, autoDelete=excluded.autoDelete`)
           .run(guildId,
-            m.enabled?1:0,
-            JSON.stringify(m.channels||[]),
-            m.message||null,
-            m.title||null,
-            m.description||null,
-            m.footer||null,
-            m.image||null,
-            m.thumbnail||null,
-            m.embed!==undefined?(m.embed?1:0):1,
-            m.ping!==undefined?(m.ping?1:0):1,
-            m.autoDelete||0
+            m.enabled ? 1 : 0,
+            JSON.stringify(m.channels || []),
+            m.message || null,
+            m.title || null,
+            m.description || null,
+            m.footer || null,
+            m.image || null,
+            m.thumbnail || null,
+            m.embed !== undefined ? (m.embed ? 1 : 0) : 1,
+            m.ping !== undefined ? (m.ping ? 1 : 0) : 1,
+            m.autoDelete || 0
           );
         return m;
       },
@@ -392,22 +405,23 @@ function makeSqlite() {
         };
       },
       set: (guildId, data) => {
-        // Merge with existing (commands send partial updates)
         const ex = db.prepare('SELECT * FROM guild_config WHERE guildId=?').get(guildId);
         const base = ex ? {
           logChannel: ex.logChannel, autoRoleId: ex.autoRoleId,
           welcomeChannel: ex.welcomeChannel, welcomeMsg: ex.welcomeMsg,
           leaveChannel: ex.leaveChannel, leaveMsg: ex.leaveMsg,
-          badWords: j(ex.badWords), antiLink: ex.antiLink===1, antiSpam: ex.antiSpam===1,
+          badWords: j(ex.badWords), antiLink: ex.antiLink === 1, antiSpam: ex.antiSpam === 1,
           adminRoles: j(ex.adminRoles), modRoles: j(ex.modRoles), ownerRoles: j(ex.ownerRoles),
           autoRoleBot: ex.autoRoleBot, autoRoleHuman: ex.autoRoleHuman,
           modLimit: ex.modLimit != null ? ex.modLimit : null,
           adminModLimit: ex.adminModLimit != null ? ex.adminModLimit : null,
           modModLimit: ex.modModLimit != null ? ex.modModLimit : null,
           prefix: ex.prefix || null,
-        } : { badWords: [], antiLink: false, antiSpam: false,
-            adminRoles: [], modRoles: [], ownerRoles: [],
-            modLimit: null, adminModLimit: null, modModLimit: null, prefix: null };
+        } : {
+          badWords: [], antiLink: false, antiSpam: false,
+          adminRoles: [], modRoles: [], ownerRoles: [],
+          modLimit: null, adminModLimit: null, modModLimit: null, prefix: null,
+        };
         const m = { ...base, ...data, guildId };
         db.prepare(`INSERT INTO guild_config (guildId,logChannel,autoRoleId,welcomeChannel,welcomeMsg,leaveChannel,leaveMsg,badWords,antiLink,antiSpam,adminRoles,modRoles,ownerRoles,autoRoleBot,autoRoleHuman,modLimit,adminModLimit,modModLimit,prefix)
           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(guildId) DO UPDATE SET
@@ -420,24 +434,24 @@ function makeSqlite() {
           modLimit=excluded.modLimit, adminModLimit=excluded.adminModLimit, modModLimit=excluded.modModLimit,
           prefix=excluded.prefix`)
           .run(guildId,
-            m.logChannel||null,
-            m.autoRoleId||null,
-            m.welcomeChannel||null,
-            m.welcomeMsg||null,
-            m.leaveChannel||null,
-            m.leaveMsg||null,
-            JSON.stringify(m.badWords||[]),
-            m.antiLink?1:0,
-            m.antiSpam?1:0,
-            JSON.stringify(m.adminRoles||[]),
-            JSON.stringify(m.modRoles||[]),
-            JSON.stringify(m.ownerRoles||[]),
-            m.autoRoleBot||null,
-            m.autoRoleHuman||null,
+            m.logChannel || null,
+            m.autoRoleId || null,
+            m.welcomeChannel || null,
+            m.welcomeMsg || null,
+            m.leaveChannel || null,
+            m.leaveMsg || null,
+            JSON.stringify(m.badWords || []),
+            m.antiLink ? 1 : 0,
+            m.antiSpam ? 1 : 0,
+            JSON.stringify(m.adminRoles || []),
+            JSON.stringify(m.modRoles || []),
+            JSON.stringify(m.ownerRoles || []),
+            m.autoRoleBot || null,
+            m.autoRoleHuman || null,
             m.modLimit == null ? null : Number(m.modLimit),
             m.adminModLimit == null ? null : Number(m.adminModLimit),
             m.modModLimit == null ? null : Number(m.modModLimit),
-            m.prefix||null
+            m.prefix || null
           );
         return m;
       },
@@ -533,14 +547,14 @@ function makeSqlite() {
           .run(userId, coin, amount),
     },
 
-    // ── Reminders (old) ─────────────────
+    // ── Reminders (legacy) ──────────────
     reminder: {
       add: (userId, channelId, at, message) => {
         const info = db.prepare('INSERT INTO reminder (userId, channelId, at, message) VALUES (?,?,?,?)').run(userId, channelId, at, message);
         return info.lastInsertRowid;
       },
       due: (now) =>
-        db.prepare('SELECT * FROM reminder WHERE at<=?').all(now).map(r => ({ ...r, _id: r.id })),
+        db.prepare('SELECT * FROM reminder WHERE at<=?').all(now).map((r) => ({ ...r, _id: r.id })),
       remove: (id) =>
         db.prepare('DELETE FROM reminder WHERE id=?').run(id).changes > 0,
     },
@@ -548,12 +562,11 @@ function makeSqlite() {
     // ── User Reminders ──────────────────
     userReminder: {
       add: (userId, channelId, guildId, reason, createdAt, triggerAt) => {
-        // Schema: 6 columns → 6 placeholders, 6 args. (Previously had 7 ?'s by mistake.)
         const info = db.prepare('INSERT INTO user_reminder (userId, channelId, guildId, reason, createdAt, triggerAt) VALUES (?,?,?,?,?,?)').run(userId, channelId, guildId, reason, createdAt, triggerAt);
         return info.lastInsertRowid;
       },
       due: (now) =>
-        db.prepare('SELECT * FROM user_reminder WHERE triggerAt<=? AND fired=0').all(now).map(r => ({ ...r, _id: r.id })),
+        db.prepare('SELECT * FROM user_reminder WHERE triggerAt<=? AND fired=0').all(now).map((r) => ({ ...r, _id: r.id })),
       markFired: (id) =>
         db.prepare('UPDATE user_reminder SET fired=1 WHERE id=?').run(id),
       list: (userId) =>
@@ -567,12 +580,11 @@ function makeSqlite() {
     // ── Timers ──────────────────────────
     timer: {
       add: (userId, channelId, guildId, reason, createdAt, triggerAt, messageId) => {
-        // Schema: 7 columns → 7 placeholders, 7 args. (Previously had 8 ?'s by mistake.)
         const info = db.prepare('INSERT INTO timer (userId, channelId, guildId, reason, createdAt, triggerAt, messageId) VALUES (?,?,?,?,?,?,?)').run(userId, channelId, guildId, reason, createdAt, triggerAt, messageId);
         return info.lastInsertRowid;
       },
       due: (now) =>
-        db.prepare('SELECT * FROM timer WHERE triggerAt<=? AND fired=0').all(now).map(r => ({ ...r, _id: r.id })),
+        db.prepare('SELECT * FROM timer WHERE triggerAt<=? AND fired=0').all(now).map((r) => ({ ...r, _id: r.id })),
       markFired: (id) =>
         db.prepare('UPDATE timer SET fired=1 WHERE id=?').run(id),
     },
@@ -580,12 +592,11 @@ function makeSqlite() {
     // ── Scheduled Messages ──────────────
     scheduled: {
       add: (guildId, channelId, authorId, content, attachmentUrl, attachmentName, createdAt, triggerAt) => {
-        // Schema: 8 columns → 8 placeholders, 8 args. (Previously had 9 ?'s by mistake — "9 values for 8 columns" bug.)
         const info = db.prepare('INSERT INTO scheduled_messages (guildId, channelId, authorId, content, attachmentUrl, attachmentName, createdAt, triggerAt) VALUES (?,?,?,?,?,?,?,?)').run(guildId, channelId, authorId, content, attachmentUrl, attachmentName, createdAt, triggerAt);
         return info.lastInsertRowid;
       },
       due: (now) =>
-        db.prepare('SELECT * FROM scheduled_messages WHERE triggerAt<=? AND sent=0').all(now).map(r => ({ ...r, _id: r.id })),
+        db.prepare('SELECT * FROM scheduled_messages WHERE triggerAt<=? AND sent=0').all(now).map((r) => ({ ...r, _id: r.id })),
       markSent: (id) =>
         db.prepare('UPDATE scheduled_messages SET sent=1 WHERE id=?').run(id),
     },
@@ -596,7 +607,7 @@ function makeSqlite() {
         db.prepare('INSERT OR IGNORE INTO transcripts (id, guildId, channelId, generatedBy, createdAt) VALUES (?,?,?,?,?)').run(id, guildId, channelId, generatedBy, createdAt),
       get: (id) => db.prepare('SELECT * FROM transcripts WHERE id=?').get(id) || null,
       delete: (id) => db.prepare('DELETE FROM transcripts WHERE id=?').run(id),
-      expired: (cutoff) => db.prepare('SELECT id FROM transcripts WHERE createdAt<?').all(cutoff).map(r => r.id),
+      expired: (cutoff) => db.prepare('SELECT id FROM transcripts WHERE createdAt<?').all(cutoff).map((r) => r.id),
     },
   };
 }
@@ -608,7 +619,7 @@ function makeMongo() {
   const mongoose = require('mongoose');
   const Schema = mongoose.Schema;
 
-  const AntiNukeConfig = mongoose.model('AntiNukeConfig', new Schema({
+  const AntiNukeConfig = mongoose.models.AntiNukeConfig || mongoose.model('AntiNukeConfig', new Schema({
     guildId: String,
     enabled: { type: Boolean, default: false },
     logChannel: String,
@@ -618,7 +629,7 @@ function makeMongo() {
     wlRoles: [String],
   }));
 
-  const GreetConfig = mongoose.model('GreetConfig', new Schema({
+  const GreetConfig = mongoose.models.GreetConfig || mongoose.model('GreetConfig', new Schema({
     guildId: String,
     enabled: { type: Boolean, default: false },
     channels: [String],
@@ -626,13 +637,10 @@ function makeMongo() {
     image: String, thumbnail: String,
     embed: { type: Boolean, default: false },
     ping: { type: Boolean, default: false },
-    // autoDelete is the delay in SECONDS (0 = no auto-delete). Must match the
-    // SQLite semantics (integer), NOT a boolean — otherwise `true * 1000 === 1000`
-    // and messages get deleted after 1 second.
     autoDelete: { type: Number, default: 0 },
   }));
 
-  const GuildConfig = mongoose.model('GuildConfig', new Schema({
+  const GuildConfig = mongoose.models.GuildConfig || mongoose.model('GuildConfig', new Schema({
     guildId: String,
     logChannel: String, autoRoleId: String,
     welcomeChannel: String, welcomeMsg: String,
@@ -651,56 +659,56 @@ function makeMongo() {
     prefix: { type: String, default: null },
   }));
 
-  const Warn = mongoose.model('Warn', new Schema({
+  const Warn = mongoose.models.Warn || mongoose.model('Warn', new Schema({
     userId: String, guildId: String, moderatorId: String, reason: String, at: Number,
   }));
 
-  const Level = mongoose.model('Level', new Schema({
+  const Level = mongoose.models.Level || mongoose.model('Level', new Schema({
     userId: String, guildId: String,
     xp: { type: Number, default: 0 }, level: { type: Number, default: 0 },
   }, { _id: false }));
 
-  const PersistRole = mongoose.model('PersistRole', new Schema({
+  const PersistRole = mongoose.models.PersistRole || mongoose.model('PersistRole', new Schema({
     userId: String, guildId: String, roleIds: [String],
   }));
 
-  const ReactionStat = mongoose.model('ReactionStat', new Schema({
+  const ReactionStat = mongoose.models.ReactionStat || mongoose.model('ReactionStat', new Schema({
     userId: String, guildId: String, wins: { type: Number, default: 0 },
   }));
 
-  const RpsStat = mongoose.model('RpsStat', new Schema({
+  const RpsStat = mongoose.models.RpsStat || mongoose.model('RpsStat', new Schema({
     userId: String, guildId: String,
     wins: Number, losses: Number, ties: Number,
   }, { _id: false }));
 
-  const CryptoBalance = mongoose.model('CryptoBalance', new Schema({
+  const CryptoBalance = mongoose.models.CryptoBalance || mongoose.model('CryptoBalance', new Schema({
     userId: String, coin: String, amount: Number,
   }));
 
-  const Reminder = mongoose.model('Reminder', new Schema({
+  const Reminder = mongoose.models.Reminder || mongoose.model('Reminder', new Schema({
     userId: String, channelId: String, at: Number, message: String,
   }));
 
-  const UserReminder = mongoose.model('UserReminder', new Schema({
+  const UserReminder = mongoose.models.UserReminder || mongoose.model('UserReminder', new Schema({
     userId: String, channelId: String, guildId: String,
     reason: String, createdAt: Number, triggerAt: Number,
     fired: { type: Boolean, default: false },
   }));
 
-  const Timer = mongoose.model('Timer', new Schema({
+  const Timer = mongoose.models.Timer || mongoose.model('Timer', new Schema({
     userId: String, channelId: String, guildId: String,
     reason: String, createdAt: Number, triggerAt: Number,
     messageId: String, fired: { type: Boolean, default: false },
   }));
 
-  const ScheduledMessage = mongoose.model('ScheduledMessage', new Schema({
+  const ScheduledMessage = mongoose.models.ScheduledMessage || mongoose.model('ScheduledMessage', new Schema({
     guildId: String, channelId: String, authorId: String,
     content: String, attachmentUrl: String, attachmentName: String,
     createdAt: Number, triggerAt: Number,
     sent: { type: Boolean, default: false },
   }));
 
-  const Transcript = mongoose.model('Transcript', new Schema({
+  const Transcript = mongoose.models.Transcript || mongoose.model('Transcript', new Schema({
     _id: String, guildId: String, channelId: String,
     generatedBy: String, createdAt: Number,
   }));
@@ -710,7 +718,7 @@ function makeMongo() {
 
   const clean = (data) => {
     if (!data || typeof data !== 'object') return {};
-    const { _id, __v, guildId, ...rest } = data;
+    const { _id: _i, __v: _v, guildId: _g, ...rest } = data;
     return rest;
   };
 
@@ -822,7 +830,7 @@ function makeMongo() {
       },
       get: async (id) => Transcript.findById(id).lean(),
       delete: async (id) => Transcript.deleteOne({ _id: id }),
-      expired: async (cutoff) => Transcript.find({ createdAt: { $lt: cutoff } }).select('_id').lean().then(r => r.map(x => String(x._id))),
+      expired: async (cutoff) => Transcript.find({ createdAt: { $lt: cutoff } }).select('_id').lean().then((r) => r.map((x) => String(x._id))),
     },
   };
 }
@@ -830,7 +838,11 @@ function makeMongo() {
 // ─────────────────────────────────────────────────────────────
 //  Init & unified getDb()
 // ─────────────────────────────────────────────────────────────
-const ALL_NS = ['antinuke', 'greet', 'guildConfig', 'warn', 'level', 'persistRole', 'reactionStat', 'rpsStat', 'crypto', 'reminder', 'userReminder', 'timer', 'scheduled'];
+const ALL_NS = [
+  'antinuke', 'greet', 'guildConfig', 'warn', 'level',
+  'persistRole', 'reactionStat', 'rpsStat', 'crypto',
+  'reminder', 'userReminder', 'timer', 'scheduled', 'transcript',
+];
 
 async function init() {
   // Always init SQLite — handles ALL data
@@ -856,8 +868,46 @@ async function init() {
   // Build unified interface
   unified = {
     backend: mongo ? 'hybrid' : 'sqlite',
+    isMongoConnected: () => !!mongo,
+    healthCheck: async () => {
+      try {
+        if (rawSqliteDb) {
+          rawSqliteDb.prepare('SELECT 1').get();
+        }
+        return {
+          status: 'healthy',
+          backend: mongo ? 'hybrid' : 'sqlite',
+          sqlite: true,
+          mongo: !!mongo,
+        };
+      } catch (err) {
+        return {
+          status: 'unhealthy',
+          error: err.message,
+          backend: mongo ? 'hybrid' : 'sqlite',
+        };
+      }
+    },
     close: async () => {
-      try { await require('mongoose').disconnect(); } catch {}
+      try {
+        if (rawSqliteDb && typeof rawSqliteDb.close === 'function') {
+          rawSqliteDb.close();
+          rawSqliteDb = null;
+        }
+      } catch (e) {
+        logger.debug('Error closing SQLite:', e.message);
+      }
+      try {
+        if (mongo) {
+          const mongoose = require('mongoose');
+          await mongoose.disconnect();
+          mongo = null;
+        }
+      } catch (e) {
+        logger.debug('Error disconnecting Mongoose:', e.message);
+      }
+      unified = null;
+      sql = null;
     },
   };
 

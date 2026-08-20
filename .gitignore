@@ -1,2 +1,9 @@
 .env
 node_modules/
+data/*.db
+data/*.db-shm
+data/*.db-wal
+data/test_bot.db*
+transcripts/*.html
+transcript-viewer/uploads/*.html
+*.log

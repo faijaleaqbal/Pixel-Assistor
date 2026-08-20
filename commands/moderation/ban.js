@@ -1,6 +1,6 @@
-// src/commands/moderation/ban.js
-const { EmbedBuilder, PermissionsBitField } = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
 const { resolveUserArg } = require('../../utils/resolveUser');
+const { canManageMember, checkBotPermissions } = require('../../utils/perms');
 const logger = require('../../utils/logger');
 
 module.exports = {
@@ -16,33 +16,34 @@ module.exports = {
     const targetUser = await resolveUserArg(message, args[0]);
     if (!targetUser) return;
 
-    // 1. Target validation
-    if (targetUser.id === message.guild.ownerId) {
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('❌ You cannot ban the server owner.')] });
-    }
-    if (targetUser.id === message.author.id) {
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('❌ You cannot ban yourself.')] });
-    }
-    if (targetUser.id === message.client.user.id) {
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('❌ I cannot ban myself.')] });
-    }
-
-    // 2. Bot permissions check
-    const botMember = message.guild.members.me || message.client.user;
-    if (!message.guild.members.me?.permissions?.has(PermissionsBitField.Flags.BanMembers)) {
+    // 1. Bot permissions check
+    const botCheck = checkBotPermissions(message, ['BanMembers']);
+    if (!botCheck.ok) {
       return message.reply({
         embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('❌ I do not have permission to **Ban Members** in this server.')],
       });
     }
 
-    // 3. Hierarchy checks
+    // 2. Hierarchy & target checks
     const member = await message.guild.members.fetch(targetUser.id).catch(() => null);
     if (member) {
-      if (message.author.id !== message.guild.ownerId && message.member.roles.highest.position <= member.roles.highest.position) {
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('❌ You cannot ban that member — they have an equal or higher role than you.')] });
+      const check = canManageMember(message.member, member, message.guild, { actionName: 'ban' });
+      if (!check.ok) {
+        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`❌ ${check.error}`)] });
       }
       if (!member.bannable) {
         return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('❌ I cannot ban that member — their highest role is equal to or above my highest role.')] });
+      }
+    } else {
+      // User is not in the guild (hackban/ID ban)
+      if (targetUser.id === message.guild.ownerId) {
+        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('❌ You cannot ban the server owner.')] });
+      }
+      if (targetUser.id === message.author.id) {
+        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('❌ You cannot ban yourself.')] });
+      }
+      if (targetUser.id === message.client.user.id) {
+        return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('❌ I cannot ban myself.')] });
       }
     }
 

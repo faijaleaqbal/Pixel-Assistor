@@ -264,7 +264,7 @@ module.exports = {
   },
 
   // Dropdown handler for network selection
-  async handleInteraction(interaction, client) {
+  async handleInteraction(interaction, _client) {
     try {
       if (!interaction.isStringSelectMenu() || interaction.customId !== 'txid_network_select') return;
 

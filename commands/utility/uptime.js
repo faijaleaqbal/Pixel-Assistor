@@ -19,7 +19,7 @@ module.exports = {
     const secs = Math.floor(uptime % 60);
 
     const embed = new EmbedBuilder()
-      .setColor(0x57F287)
+      .setColor(config.embedColor || 0x57F287)
       .setTitle('⏱️ Bot Uptime')
       .setDescription(`\`\`\`${days}d ${hours}h ${mins}m ${secs}s\`\`\`\nStarted: <t:${Math.floor((Date.now() - uptime * 1000) / 1000)}:R>`)
       .setTimestamp();

@@ -5,20 +5,17 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
-  normalizeNetworkName,
   detectAddressNetwork,
   detectTxFormat,
   parseTxCommandInput,
 } = require('../utils/crypto/networkDetector');
 const { EVMTransactionParser, EVM_CHAINS, formatTokenUnits } = require('../utils/crypto/parsers/evmParser');
-const { LitecoinTransactionParser, round8 } = require('../utils/crypto/parsers/litecoinParser');
+const { LitecoinTransactionParser } = require('../utils/crypto/parsers/litecoinParser');
 const { SolanaTransactionParser } = require('../utils/crypto/parsers/solanaParser');
-const { TronTransactionParser } = require('../utils/crypto/parsers/tronParser');
 const { createNormalizedTx, validateNormalizedTx, sanitizeTimestamp } = require('../utils/crypto/types');
-const { resolveTokenMetadata, decodeAbiString, decodeAbiUint } = require('../utils/crypto/tokenRegistry');
-const { enrichTransactionWithPrices, getCoinIdForSymbol } = require('../utils/crypto/priceService');
-const { buildTransactionEmbed, formatCryptoAmount, formatUsdAmount, formatUtcTimestamp } = require('../utils/crypto/embedFormatter');
-const { parseTransaction } = require('../utils/crypto');
+const { resolveTokenMetadata, decodeAbiUint } = require('../utils/crypto/tokenRegistry');
+const { enrichTransactionWithPrices } = require('../utils/crypto/priceService');
+const { buildTransactionEmbed } = require('../utils/crypto/embedFormatter');
 const cryptoApi = require('../utils/cryptoApi');
 
 describe('Deterministic Network Detection', () => {
@@ -486,12 +483,12 @@ describe('Litecoin UTXO Accounting & Edge Cases', () => {
       confirmations: 10,
     };
 
-    const inputs = blockcypherFixture.inputs.map((inp, idx) => {
+    const inputs = blockcypherFixture.inputs.map((inp) => {
       const addr = inp.addresses[0];
       const sats = BigInt(inp.output_value);
       return { address: addr, sats, amount: Number(sats) / 1e8, symbol: 'LTC' };
     });
-    const outputs = blockcypherFixture.outputs.map((out, idx) => {
+    const outputs = blockcypherFixture.outputs.map((out) => {
       const addr = out.addresses[0];
       const sats = BigInt(out.value);
       return { address: addr, sats, amount: Number(sats) / 1e8, symbol: 'LTC' };
@@ -531,9 +528,6 @@ describe('Litecoin UTXO Accounting & Edge Cases', () => {
     const queriedAddress = 'ltc1qreceiveraddress1234567890abcdef';
     const senderAddress = 'ltc1qsenderaddress1234567890abcdef';
 
-    const inputs = [
-      { txid: 'in1', vout: 0, address: senderAddress, sats: 7800000n, amount: 0.078, symbol: 'LTC' },
-    ];
     const outputs = [
       { vout: 0, address: queriedAddress, sats: 2276348n, amount: 0.02276348, symbol: 'LTC' },
       { vout: 1, address: senderAddress, sats: 5500000n, amount: 0.055, symbol: 'LTC' },

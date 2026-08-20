@@ -1,8 +1,9 @@
 // src/commands/moderation/warn.js
 const { EmbedBuilder } = require('discord.js');
 const { getDb } = require('../../utils/db');
-const { hasPermission } = require('../../utils/perms');
+const { hasPermission, canManageMember } = require('../../utils/perms');
 const { resolveMemberArg } = require('../../utils/resolveUser');
+
 module.exports = {
   name: 'warn',
   category: 'moderation',
@@ -25,7 +26,7 @@ module.exports = {
         value: `${r.reason || '(no reason)'} *(by <@${r.moderatorId}>)*`,
         inline: false,
       }));
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setTitle(`\u26A0\uFE0F Warnings for ${target.user.tag} (${rows.length})`).addFields(fields)] });
+      return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setTitle(`⚠️ Warnings for ${target.user.tag} (${rows.length})`).addFields(fields)] });
     }
 
     // ?warn remove <id>
@@ -39,8 +40,10 @@ module.exports = {
     if (sub === 'clear') {
       const target = await resolveMemberArg(message, args[1]);
       if (!target) return;
+      const check = canManageMember(message.member, target, message.guild, { actionName: 'manage warnings for' });
+      if (!check.ok) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`❌ ${check.error}`)] });
       const count = await db.warn.clear(target.id, message.guild.id);
-      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`\u2705 Cleared ${count} warning(s) for ${target.user.tag}.`)] });
+      return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Cleared ${count} warning(s) for ${target.user.tag}.`)] });
     }
 
     // ?warn clearall
@@ -49,11 +52,9 @@ module.exports = {
         return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Only administrators can clear all server warnings.')] });
       }
       try {
-        // Single SQL/Mongo query — much faster + works regardless of guild size
-        // (members.fetch only returns 1000 rows in large guilds).
         const total = await db.warn.clearGuild(message.guild.id);
-        return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`\u2705 Cleared ${total} warning(s) across all members.`)] });
-      } catch (e) {
+        return message.reply({ embeds: [new EmbedBuilder().setColor(0x57F287).setDescription(`✅ Cleared ${total} warning(s) across all members.`)] });
+      } catch {
         return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('Failed to clear guild warnings.')] });
       }
     }
@@ -62,10 +63,19 @@ module.exports = {
     const targetIndex = sub === 'add' ? 1 : 0;
     const target = await resolveMemberArg(message, args[targetIndex]);
     if (!target) return;
-    if (target.id === message.author.id) return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('You cannot warn yourself.')] });
+
+    if (target.user.bot) {
+      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription('❌ You cannot warn a bot.')] });
+    }
+
+    const check = canManageMember(message.member, target, message.guild, { actionName: 'warn' });
+    if (!check.ok) {
+      return message.reply({ embeds: [new EmbedBuilder().setColor(0xED4245).setDescription(`❌ ${check.error}`)] });
+    }
+
     const reasonStart = targetIndex + 1;
     const reason = args.slice(reasonStart).filter(a => !/^<@!?\d+>$/.test(a)).join(' ') || 'No reason provided.';
     await db.warn.add(target.id, message.guild.id, message.author.id, reason, Date.now());
-    return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription(`\u26A0\uFE0F ${target.user.tag} has been warned.\n**Reason:** ${reason}`)] });
+    return message.reply({ embeds: [new EmbedBuilder().setColor(0xFEE75C).setDescription(`⚠️ ${target.user.tag} has been warned.\n**Reason:** ${reason}`)] });
   },
 };

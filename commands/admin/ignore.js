@@ -15,7 +15,7 @@ const { getDb } = require('../../utils/db');
 const { resolveUserArg } = require('../../utils/resolveUser');
 
 const E = (c, d) => new EmbedBuilder().setColor(c).setDescription(d);
-const RED = 0xED4245, GREEN = 0x57F287, BLUE = 0x5865F2, YELLOW = 0xFEE75C;
+const RED = 0xED4245, GREEN = 0x57F287, BLUE = 0x5865F2;
 
 const TYPES = ['channel', 'user', 'command', 'module'];
 const BYPASS_TYPES = { channel: 'bypass_channel', user: 'bypass_user' };

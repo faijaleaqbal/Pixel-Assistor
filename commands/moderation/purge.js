@@ -99,7 +99,7 @@ async function purgeMessages(channel, count, filterFn) {
           if (!isAll && totalDeleted >= count) {
             break;
           }
-        } catch (e) {
+        } catch {
           // Gracefully stop on API permission / rate limit error
           break;
         }

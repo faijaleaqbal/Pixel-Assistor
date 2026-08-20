@@ -11,7 +11,6 @@ const {
   tronParser,
   detectAddressNetwork,
   detectTxFormat,
-  normalizeNetworkName,
   getUsdPrice,
   EVM_CHAINS,
 } = require('./crypto');
@@ -43,16 +42,14 @@ async function fetchWithTimeout(url, options = {}) {
   }
 }
 
-async function safeJson(r, label = 'API', url = '') {
+async function safeJson(r, label = 'API') {
   const ct = (r.headers.get('content-type') || '').toLowerCase();
   if (!ct.includes('application/json') && !ct.includes('text/json')) {
-    let body = '';
-    try { body = await r.text(); } catch {}
     throw new Error(`${label} returned non-JSON response.`);
   }
   try {
     return await r.json();
-  } catch (e) {
+  } catch {
     throw new Error(`${label} returned malformed JSON.`);
   }
 }
@@ -168,7 +165,6 @@ async function evmFetchBalance(chainKey, address) {
   const chain = EVM_CHAINS[chainKey];
   if (!chain) throw new Error(`Unknown EVM chain: ${chainKey}`);
 
-  const parser = getEvmParser(chainKey);
   const { callRpc } = require('./crypto/parsers/evmParser');
 
   let nativeBalance = 0;

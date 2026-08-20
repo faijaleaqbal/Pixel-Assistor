@@ -1,10 +1,11 @@
 // src/index.js
-// Entry point. Boots the Discord client, loads commands + events, starts the
-// reminder poller, and wires a global error catch.
+// Production entry point. Boots the Discord client, loads commands + events,
+// initializes database, starts background pollers, and manages graceful shutdowns.
 
 const { Client, GatewayIntentBits, Partials, Options } = require('discord.js');
 const config = require('./utils/config');
 const logger = require('./utils/logger');
+const { init: dbInit, getDb } = require('./utils/db');
 const commandHandler = require('./handlers/commandHandler');
 const eventHandler = require('./handlers/eventHandler');
 
@@ -28,31 +29,44 @@ const client = new Client({
   sweepers: Options.DefaultSweepers,
 });
 
-// Load commands + events BEFORE login so event listeners
-// actually fire when the gateway connects.
-commandHandler.load(client);
-eventHandler.load(client);
+async function bootstrap() {
+  try {
+    // 1. Initialize Database first
+    await dbInit();
 
-// Global error guards. Unhandled rejections are logged; fatal uncaught exceptions
-// log details and exit cleanly with code 1 so PM2/systemd can restart a healthy process.
+    // 2. Load commands + events
+    commandHandler.load(client);
+    eventHandler.load(client);
+
+    // 3. Connect to Discord Gateway
+    await client.login(config.token);
+  } catch (err) {
+    logger.error('FATAL bootstrap error — exiting for supervisor restart:', err?.stack || err?.message || err);
+    process.exit(1);
+  }
+}
+
+// Global error guards
 process.on('unhandledRejection', (r) => logger.error('unhandledRejection', r?.stack || r?.message || r));
 process.on('uncaughtException', (e) => {
   logger.error('FATAL uncaughtException — exiting for supervisor restart:', e?.stack || e?.message || e);
   process.exit(1);
 });
 
-// Graceful shutdown on termination signals
+// Graceful shutdown
+let isShuttingDown = false;
 async function shutdown(signal) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
   logger.info(`Received ${signal}. Shutting down cleanly...`);
   try {
     if (client) client.destroy();
-    const { getDb } = require('./utils/db');
     const db = getDb();
     if (db && typeof db.close === 'function') {
       await db.close();
     }
-  } catch {
-    /* ignore shutdown error */
+  } catch (err) {
+    logger.debug('Error during shutdown:', err?.message);
   } finally {
     process.exit(0);
   }
@@ -61,4 +75,4 @@ async function shutdown(signal) {
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
-client.login(config.token);
+bootstrap();
