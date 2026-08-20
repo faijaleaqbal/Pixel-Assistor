@@ -16,6 +16,7 @@ const { EMOJI, DISPLAY, DESC } = require('../../utils/categories');
 const { getPrefix } = require('../../utils/prefixCache');
 const logger = require('../../utils/logger');
 const subs = require('../../utils/subcommands');
+const { safeUpdate } = require('../../utils/interactionHelper');
 
 // State map: messageId -> { userId, username, category, page, total, prefix }
 const state = new Map();
@@ -176,10 +177,8 @@ module.exports = {
           st.category = null;
           st.page = 0;
           st.total = 1;
-          state.set(messageId, st);
-
           const homeEmbed = buildHomeEmbed(client, currentPrefix, interaction.user);
-          return interaction.update({
+          return safeUpdate(interaction, {
             embeds: [homeEmbed],
             components: makeRows(null, 0, 1),
           });
@@ -193,7 +192,7 @@ module.exports = {
         state.set(messageId, st);
 
         const catEmbed = buildCategoryEmbed(client, selected, 0, totalPages, currentPrefix);
-        return interaction.update({
+        return safeUpdate(interaction, {
           embeds: [catEmbed],
           components: makeRows(selected, 0, totalPages),
         });
@@ -210,7 +209,7 @@ module.exports = {
           state.set(messageId, st);
 
           const homeEmbed = buildHomeEmbed(client, currentPrefix, interaction.user);
-          return interaction.update({
+          return safeUpdate(interaction, {
             embeds: [homeEmbed],
             components: makeRows(null, 0, 1),
           });
@@ -231,7 +230,7 @@ module.exports = {
 
         state.set(messageId, st);
         const catEmbed = buildCategoryEmbed(client, st.category, st.page, totalPages, currentPrefix);
-        return interaction.update({
+        return safeUpdate(interaction, {
           embeds: [catEmbed],
           components: makeRows(st.category, st.page, totalPages),
         });

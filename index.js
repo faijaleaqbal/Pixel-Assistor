@@ -47,8 +47,19 @@ async function bootstrap() {
 }
 
 // Global error guards
-process.on('unhandledRejection', (r) => logger.error('unhandledRejection', r?.stack || r?.message || r));
+process.on('unhandledRejection', (r) => {
+  if (r?.code === 10062 || r?.code === 10008 || r?.message?.includes('Unknown interaction') || r?.message?.includes('Unknown Message')) {
+    logger.debug('Swallowed benign async interaction error:', r.message);
+    return;
+  }
+  logger.error('unhandledRejection', r?.stack || r?.message || r);
+});
+
 process.on('uncaughtException', (e) => {
+  if (e?.code === 10062 || e?.code === 10008 || e?.message?.includes('Unknown interaction') || e?.message?.includes('Unknown Message')) {
+    logger.debug('Swallowed benign interaction error:', e.message);
+    return;
+  }
   logger.error('FATAL uncaughtException — exiting for supervisor restart:', e?.stack || e?.message || e);
   process.exit(1);
 });
