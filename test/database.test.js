@@ -1,16 +1,25 @@
 // test/database.test.js
+
+// MUST be set before any require pulls in utils/config.
+process.env.DB_SQLITE_PATH = './data/test_bot.db';
+
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const { init } = require('../utils/db');
+const { sqlitePath } = require('../utils/config');
+
+// SAFETY GUARD: tests must never touch the production database.
+if (!String(sqlitePath).includes('data/test_')) {
+  throw new Error(`SAFETY GUARD: tests resolved to non-test database "${sqlitePath}". Aborting.`);
+}
 
 describe('Database Parity & Operational Integrity (SQLite Driver)', () => {
   const testDbFile = path.resolve(__dirname, '../data/test_bot.db');
   let db;
 
   before(async () => {
-    process.env.DB_SQLITE_PATH = './data/test_bot.db';
     if (fs.existsSync(testDbFile)) {
       try { fs.unlinkSync(testDbFile); } catch {}
     }

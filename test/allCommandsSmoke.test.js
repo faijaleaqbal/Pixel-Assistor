@@ -5,7 +5,7 @@
 // heuristic args). Failures are classified: BUG vs NETWORK vs MOCK-GAP.
 // Run: node --test test/allCommandsSmoke.test.js
 
-process.env.DB_SQLITE_PATH = './data/test_bot.db';
+process.env.DB_SQLITE_PATH = './data/test_smoke.db';
 process.env.OWNER_ID = process.env.OWNER_ID || 'test_owner_id';
 
 const { describe, it, before, after } = require('node:test');
@@ -14,10 +14,16 @@ const fs = require('fs');
 const path = require('path');
 
 const { init } = require('../utils/db');
+const { sqlitePath: smokeSqlitePath } = require('../utils/config');
+
+// SAFETY GUARD: tests must never touch the production database.
+if (!String(smokeSqlitePath).includes('data/test_')) {
+  throw new Error(`SAFETY GUARD: tests resolved to non-test database "${smokeSqlitePath}". Aborting.`);
+}
 const commandHandler = require('../handlers/commandHandler');
 const meta = require('../utils/commandMeta');
 
-const TEST_DB = path.resolve(__dirname, '../data/test_bot.db');
+const TEST_DB = path.resolve(__dirname, '../data/test_smoke.db');
 
 // ─────────────────────────────────────────────────────────────
 // Mock Discord environment
