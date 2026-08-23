@@ -1,6 +1,7 @@
 // src/commands/games/reactionstats.js
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts } = require('../../utils/v2Reply');
 const { getDb } = require('../../utils/db');
 const { resolveUserArg } = require('../../utils/resolveUser');
 
@@ -19,6 +20,6 @@ module.exports = {
     try {
       row = await getDb().reactionStat.get(target.id, message.guild.id);
     } catch { /* db not ready */ }
-    return message.reply({ embeds: [responseBuilder.buildResult({ title: `⚡ Reaction stats — ${target.username}`, fields: [{ name: 'Wins', value: String(row.wins || 0), inline: true }]})], allowedMentions: { parse: [] } });
+    return message.reply(opts(responseBuilder.buildResult({ title: `⚡ Reaction stats — ${target.username}`, fields: [{ name: 'Wins', value: String(row.wins || 0), inline: true }]}), { allowedMentions: { parse: [] } }));
   },
 };

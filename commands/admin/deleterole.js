@@ -1,5 +1,6 @@
 // src/commands/admin/deleterole.js
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts } = require('../../utils/v2Reply');
 const { canManageRole } = require('../../utils/perms');
 
 module.exports = {
@@ -13,21 +14,21 @@ module.exports = {
   args: true,
   async execute(message, args, client) {
     const input = args.join(' ');
-    if (!input) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'Provide a role name, mention, or ID.'})] });
+    if (!input) return message.reply(opts(responseBuilder.buildResult({ description: 'Provide a role name, mention, or ID.'})));
 
     const role = message.guild.roles.cache.find(r => r.id === input || r.name.toLowerCase() === input.toLowerCase() || `<@&${r.id}>` === input);
-    if (!role) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'Role not found.'})] });
+    if (!role) return message.reply(opts(responseBuilder.buildResult({ description: 'Role not found.'})));
 
     const check = canManageRole(message.member, role, message.guild, { actionName: 'delete' });
     if (!check.ok) {
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: `❌ ${check.error}`})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: `❌ ${check.error}`})));
     }
 
     try {
       await role.delete(`Deleted by ${message.author.tag}`);
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Role **${role.name}** deleted.`})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: `✅ Role **${role.name}** deleted.`})));
     } catch (e) {
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: `Failed: ${e.message}`})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: `Failed: ${e.message}`})));
     }
   },
 };

@@ -3,6 +3,7 @@
 // Unlike ?userinfo (which requires guild membership), ?whois works for ANY Discord user.
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts } = require('../../utils/v2Reply');
 const { resolveUserArg } = require('../../utils/resolveUser');
 const { getDb } = require('../../utils/db');
 
@@ -22,10 +23,10 @@ module.exports = {
     // Try fetching guild member (expected to fail if they left / were never here)
     const member = await message.guild.members.fetch(target.id).catch(() => null);
 
-    const e = responseBuilder.buildResult({ title: `@${target.username}\'s User Information`, thumbnail: target.displayAvatarURL({ size: 512 })});
+    const fields = [];
 
     // ── General ──
-    e.addFields(
+    fields.push(
       { name: 'ID', value: target.id, inline: true },
       { name: 'Username', value: target.username, inline: true },
       { name: 'Display Name', value: target.globalName || target.displayName || target.username, inline: true },
@@ -33,7 +34,7 @@ module.exports = {
     );
 
     // ── Created At (always available) ──
-    e.addFields({
+    fields.push({
       name: 'Created At',
       value: `<t:${Math.floor(target.createdTimestamp / 1000)}:R> (<t:${Math.floor(target.createdTimestamp / 1000)}:F>)`,
       inline: false,
@@ -41,13 +42,13 @@ module.exports = {
 
     // ── Joined At — ONLY if a current member ──
     if (member) {
-      e.addFields({
+      fields.push({
         name: 'Joined At',
         value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:R> (<t:${Math.floor(member.joinedTimestamp / 1000)}:F>)`,
         inline: false,
       });
     } else {
-      e.addFields({ name: 'Joined At', value: 'Not currently a member of this server', inline: false });
+      fields.push({ name: 'Joined At', value: 'Not currently a member of this server', inline: false });
     }
 
     // ── Roles — ONLY if a member ──
@@ -57,7 +58,7 @@ module.exports = {
         .map((r) => `<@&${r.id}>`)
         .slice(0, 15)
         .join(', ') || '—';
-      e.addFields({ name: `Roles [${member.roles.cache.size - 1}]`, value: roles, inline: false });
+      fields.push({ name: `Roles [${member.roles.cache.size - 1}]`, value: roles, inline: false });
     }
 
     // ── Latest Activity — ONLY if a member with tracked data ──
@@ -66,16 +67,16 @@ module.exports = {
         const db = getDb();
         const reaction = (await db.reactionStat.get(target.id, message.guild.id)).wins || 0;
         const warns = (await db.warn.list(target.id, message.guild.id)).length;
-        e.addFields({
+        fields.push({
           name: 'Latest Activity',
           value: `Reaction Wins: **${reaction}** | Warns: **${warns}**`,
           inline: false,
         });
       } catch {
-        e.addFields({ name: 'Latest Activity', value: 'No activity data available.', inline: false });
+        fields.push({ name: 'Latest Activity', value: 'No activity data available.', inline: false });
       }
     } else {
-      e.addFields({ name: 'Latest Activity', value: 'No activity data — user is not in this server.', inline: false });
+      fields.push({ name: 'Latest Activity', value: 'No activity data — user is not in this server.', inline: false });
     }
 
     // ── Key Permissions — ONLY if a member ──
@@ -86,16 +87,20 @@ module.exports = {
         'DeafenMembers', 'MoveMembers', 'ModerateMembers',
       ];
       const has = keyPerms.filter((p) => member.permissions.has(p));
-      e.addFields({
+      fields.push({
         name: 'Key Permissions',
         value: has.length ? has.map((p) => `\`${p}\``).join(', ') : 'No Key Permissions',
         inline: false,
       });
     }
 
-    e.setFooter({ text: `Requested by @${message.author.tag} • ${new Date().toLocaleString()}` });
-    e.setTimestamp();
+    const e = responseBuilder.buildResult({
+      title: `@${target.username}'s User Information`,
+      thumbnail: target.displayAvatarURL({ size: 512 }),
+      fields,
+      customFooter: `Requested by @${message.author.tag} • ${new Date().toLocaleString()}`,
+    });
 
-    return message.reply({ embeds: [e], allowedMentions: { parse: [] } });
+    return message.reply(opts(e, { allowedMentions: { parse: [] } }));
   },
 };

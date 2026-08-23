@@ -2,6 +2,7 @@
 // Shared helpers for anti-nuke event listeners.
 
 const { AuditLogEvent } = require('discord.js');
+const { opts } = require('../utils/v2Reply');
 
 const RED = 0xED4245, ORANGE = 0xFF6B00;
 
@@ -48,12 +49,12 @@ async function fetchAuditEntry(guild, type, targetId) {
 }
 
 /**
- * Send an embed to the configured anti-nuke log channel.
+ * Send a Components V2 container to the configured anti-nuke log channel.
  */
-async function sendLog(guild, cfg, client, embed) {
+async function sendLog(guild, cfg, client, container) {
   if (!cfg || !cfg.logChannel) return;
   const ch = client.channels.cache.get(cfg.logChannel);
-  if (ch) ch.send({ embeds: [embed] }).catch(() => {});
+  if (ch) ch.send(opts(container)).catch(() => {});
 }
 
 /**

@@ -1,6 +1,7 @@
 // src/commands/moderation/clone.js
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts } = require('../../utils/v2Reply');
 
 module.exports = {
   name: 'clone',
@@ -15,9 +16,9 @@ module.exports = {
     const newName = args.slice(message.mentions.channels.first() ? 1 : 0).join('-') || `${src.name}-clone`;
     try {
       const cloned = await src.clone({ name: newName });
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Cloned to <#${cloned.id}>.`})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: `✅ Cloned to <#${cloned.id}>.`})));
     } catch (e) {
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: `Clone failed: **${e.message}**`})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: `Clone failed: **${e.message}**`})));
     }
   },
 };

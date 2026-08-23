@@ -26,6 +26,7 @@
 // Permissions: existing ManageMessages check (kept for all three forms).
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts, buildContainer } = require('../../utils/v2Reply');
 const { getDb } = require('../../utils/db');
 const ms = require('../../utils/ms');
 const { sendTempReply } = require('../../utils/tempReply');
@@ -84,16 +85,16 @@ module.exports = {
 
     const botPerms = targetChannel.permissionsFor(message.guild.members.me);
     if (!botPerms || !botPerms.has('SendMessages')) {
-      return message.reply({ embeds: [
+      return message.reply(opts(
         responseBuilder.buildResult({ description: `I don't have **SendMessages** permission in ${targetChannel}.`}),
-      ] });
+      ));
     }
 
     const hasAttachment = message.attachments.size > 0;
     if (hasAttachment && !botPerms.has('AttachFiles')) {
-      return message.reply({ embeds: [
+      return message.reply(opts(
         responseBuilder.buildResult({ description: `I don't have **AttachFiles** permission in ${targetChannel} (your message has an attachment).`}),
-      ] });
+      ));
     }
 
     const attachment = hasAttachment ? message.attachments.first() : null;
@@ -101,27 +102,27 @@ module.exports = {
     // ── 5a. CASE 1 + 2: send immediately (no delay) ──
     if (!delayMs) {
       try {
-        const sendOpts = { content: content || '' };
+        const sendOpts = opts(buildContainer({ description: content || '\u200b' }));
         if (attachment) {
           sendOpts.files = [{ attachment: attachment.url, name: attachment.name || 'attachment' }];
         }
         await targetChannel.send(sendOpts);
-        return sendTempReply(message, { embeds: [
+        return sendTempReply(message, opts(
           responseBuilder.buildResult({ description: `✅ Sent to ${targetChannel}.`}),
-        ] });
+        ));
       } catch (e) {
-        return message.reply({ embeds: [
+        return message.reply(opts(
           responseBuilder.buildResult({ description: `Failed to send to ${targetChannel}: ${e.message}`}),
-        ] });
+        ));
       }
     }
 
     // ── 5b. CASE 3: scheduled send — store in DB, poller will fire ──
     // Cap duration at 1 year so users don't schedule impossibly far out.
     if (delayMs > 365.25 * 86_400_000) {
-      return message.reply({ embeds: [
-        responseBuilder.buildResult({ description: 'Maximum schedule duration is **1 year**.'})],
-      });
+      return message.reply(opts(
+        responseBuilder.buildResult({ description: 'Maximum schedule duration is **1 year**.'}),
+      ));
     }
 
     const triggerAt = Date.now() + delayMs;
@@ -139,23 +140,23 @@ module.exports = {
         triggerAt
       );
     } catch (e) {
-      return message.reply({ embeds: [
+      return message.reply(opts(
         responseBuilder.buildResult({ description: `Failed to schedule: ${e.message}`}),
-      ] });
+      ));
     }
 
     const embed = responseBuilder.buildResult({ description: `✅ Scheduled — will be sent to ${targetChannel} <t:${Math.floor(triggerAt / 1000)}:R>.`
         + (attachment ? `\n📎 Includes attachment: **${attachment.name}**` : '')});
 
-    return sendTempReply(message, { embeds: [embed] });
+    return sendTempReply(message, opts(embed));
   },
 };
 
 function usageError(message, text) {
-  return message.reply({ embeds: [
+  return message.reply(opts(
     responseBuilder.buildResult({ description: `${text}\n\n**Usage:**\n` +
       '• `?sent <message>` — send now in this channel\n' +
       '• `?sent #channel <message>` — send now in another channel\n' +
       '• `?sent #channel <time> <message>` — schedule for later (e.g. `30s`, `5m`, `2h`, `1d`)'}),
-  ] });
+  ));
 }

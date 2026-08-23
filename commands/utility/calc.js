@@ -4,6 +4,7 @@ const responseBuilder = require('../../utils/responseBuilder');
 
 const { ApplicationCommandOptionType } = require('discord.js');
 const { evaluate } = require('../../utils/mathEval');
+const { opts } = require('../../utils/v2Reply');
 
 module.exports = {
   name: 'calc',
@@ -25,12 +26,12 @@ module.exports = {
   async execute(message, args, client) {
     const expr = args.join(' ');
     const embed = evaluateMath(expr);
-    return message.reply({ embeds: [embed] });
+    return message.reply(opts(embed));
   },
   async slashExecute(interaction) {
     const expr = interaction.options.getString('expression', true);
     const embed = evaluateMath(expr);
-    return interaction.reply({ embeds: [embed] });
+    return interaction.reply(opts(embed));
   },
 };
 

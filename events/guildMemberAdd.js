@@ -1,9 +1,9 @@
 // src/events/guildMemberAdd.js
 // Re-applies persisted roles + auto-role on join + welcome message.
 
-const { EmbedBuilder } = require('discord.js');
 const { getDb } = require('../utils/db');
 const logger = require('../utils/logger');
+const { opts, buildContainer } = require('../utils/v2Reply');
 
 module.exports = {
   name: 'guildMemberAdd',
@@ -40,8 +40,13 @@ module.exports = {
             .replace(/{mention}/g, member.user.toString())
             .replace(/{server}/g, member.guild.name)
             .replace(/{count}/g, String(member.guild.memberCount));
-          const embed = new EmbedBuilder().setColor(0x57F287).setTitle('Welcome!').setDescription(text).setThumbnail(member.user.displayAvatarURL({ size: 128 })).setTimestamp();
-          await ch.send({ embeds: [embed] }).catch(() => {});
+          const container = buildContainer({
+            title: 'Welcome!',
+            description: text,
+            color: '#57F287',
+            thumbnail: member.user.displayAvatarURL({ size: 128 }),
+          });
+          await ch.send(opts(container)).catch(() => {});
         }
       }
 
@@ -61,17 +66,26 @@ module.exports = {
 
             let sent;
             if (greetCfg.embed) {
-              const embed = new EmbedBuilder().setColor(0x57F287);
-              if (greetCfg.title) embed.setTitle(greetCfg.title);
-              embed.setDescription(msgText);
-              if (greetCfg.thumbnail) embed.setThumbnail(greetCfg.thumbnail);
-              if (greetCfg.image) embed.setImage(greetCfg.image);
-              if (greetCfg.footer) embed.setFooter({ text: greetCfg.footer });
-              embed.setTimestamp();
-              const payload = greetCfg.ping ? { content: member.user.toString(), embeds: [embed] } : { embeds: [embed] };
+              const description = greetCfg.ping ? `${member.user.toString()}\n${msgText}` : msgText;
+              const container = buildContainer({
+                title: greetCfg.title,
+                description,
+                color: '#57F287',
+                thumbnail: greetCfg.thumbnail,
+                image: greetCfg.image,
+                customFooter: greetCfg.footer,
+              });
+              const payload = greetCfg.ping
+                ? opts(container, { allowedMentions: { users: [member.user.id] } })
+                : opts(container);
               sent = await ch.send(payload).catch(() => {});
             } else {
-              const payload = greetCfg.ping ? { content: `${member.user.toString()}\n${msgText}` } : { content: msgText };
+              const container = buildContainer({
+                description: greetCfg.ping ? `${member.user.toString()}\n${msgText}` : msgText,
+              });
+              const payload = greetCfg.ping
+                ? opts(container, { allowedMentions: { users: [member.user.id] } })
+                : opts(container);
               sent = await ch.send(payload).catch(() => {});
             }
 

@@ -2,6 +2,7 @@
 // Leaderboard / top stats — reaction wins and RPS wins.
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts } = require('../../utils/v2Reply');
 const { getDb } = require('../../utils/db');
 
 module.exports = {
@@ -26,13 +27,13 @@ module.exports = {
       title = '⚡ Reaction Top 10';
       valueFn = (r) => `${r.wins} wins`;
     }
-    if (!rows.length) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'No data yet — play a few rounds first.'})] });
+    if (!rows.length) return message.reply(opts(responseBuilder.buildResult({ description: 'No data yet — play a few rounds first.'})));
 
     const fields = rows.map((r, i) => ({
       name: `#${i + 1} — <@${r.userId}>`,
       value: valueFn(r),
       inline: false,
     }));
-    return message.reply({ embeds: [responseBuilder.buildResult({ title: title, fields: [fields]})], allowedMentions: { parse: [] } });
+    return message.reply(opts(responseBuilder.buildResult({ title: title, fields: fields}), { allowedMentions: { parse: [] } }));
   },
 };

@@ -1,6 +1,7 @@
 // src/commands/upi/removeupi.js
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts } = require('../../utils/v2Reply');
 const { getDb } = require('../../utils/db');
 
 module.exports = {
@@ -14,7 +15,7 @@ module.exports = {
   async execute(message, args, client) {
     const label = args[0];
     const removed = await getDb().upi.remove(message.author.id, label);
-    if (!removed) return message.reply({ embeds: [responseBuilder.buildResult({ description: `No saved UPI under label \`${label}\`.`})] });
-    return message.reply({ embeds: [responseBuilder.buildResult({ description: `🗑️ Removed UPI \`${label}\`.`})] });
+    if (!removed) return message.reply(opts(responseBuilder.buildResult({ description: `No saved UPI under label \`${label}\`.` })));
+    return message.reply(opts(responseBuilder.buildResult({ description: `🗑️ Removed UPI \`${label}\`.`})));
   },
 };

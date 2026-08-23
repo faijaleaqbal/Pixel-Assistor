@@ -2,6 +2,10 @@
 // Shared utility: send a reply and auto-delete it after a delay.
 // Used for short action-confirmation messages ("✅ Done" style),
 // NOT for informational replies the user needs to keep reading.
+// Plain strings are auto-wrapped into a Components V2 container;
+// pre-built payloads (v2Reply.opts(...) output) are passed through as-is.
+
+const { buildContainer, opts } = require('./v2Reply');
 
 /**
  * Send a temporary reply that auto-deletes after `ms` milliseconds.
@@ -11,11 +15,12 @@
  * @returns {Promise<import('discord.js').Message|null>}
  */
 async function sendTempReply(message, content, ms = 5000) {
-  const opts = typeof content === 'string'
-    ? { content, allowedMentions: { parse: [] } }
-    : { ...content, allowedMentions: { parse: [] } };
+  const payload = typeof content === 'string'
+    ? opts(buildContainer({ description: content }))
+    : { ...content };
+  payload.allowedMentions = { parse: [] };
   try {
-    const msg = await message.reply(opts);
+    const msg = await message.reply(payload);
     if (msg) {
       setTimeout(() => msg.delete().catch(() => {}), ms).unref?.();
     }

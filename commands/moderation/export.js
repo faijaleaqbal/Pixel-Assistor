@@ -8,6 +8,7 @@
 // Permissions: ManageMessages (staff-only).
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts } = require('../../utils/v2Reply');
 const discordTranscripts = require('discord-html-transcripts');
 const { sendTempReply } = require('../../utils/tempReply');
 
@@ -34,15 +35,15 @@ module.exports = {
     try {
       messages = await message.channel.messages.fetch({ limit: count });
     } catch (e) {
-      return sendTempReply(message, {
-        embeds: [responseBuilder.buildResult({ description: `Failed to fetch messages: ${e.message}`})],
-      });
+      return sendTempReply(message, opts(
+        responseBuilder.buildResult({ description: `Failed to fetch messages: ${e.message}`}),
+      ));
     }
 
     if (!messages || !messages.size) {
-      return sendTempReply(message, {
-        embeds: [responseBuilder.buildResult({ description: 'No messages found in this channel.'})],
-      });
+      return sendTempReply(message, opts(
+        responseBuilder.buildResult({ description: 'No messages found in this channel.'}),
+      ));
     }
 
     const sorted = messages.sort((a, b) => a.createdTimestamp - b.createdTimestamp);
@@ -55,9 +56,9 @@ module.exports = {
         saveImages: true,
       });
     } catch (e) {
-      return sendTempReply(message, {
-        embeds: [responseBuilder.buildResult({ description: `Failed to generate transcript: ${e.message}`})],
-      });
+      return sendTempReply(message, opts(
+        responseBuilder.buildResult({ description: `Failed to generate transcript: ${e.message}`}),
+      ));
     }
 
     // ── 4. DM the file to the command author ──
@@ -66,23 +67,22 @@ module.exports = {
           { name: 'Channel', value: `#${message.channel.name || message.channelId}`, inline: true },
           { name: 'Messages', value: `${sorted.size}`, inline: true },]});
 
-      await message.author.send({
-        embeds: [dmEmbed],
+      await message.author.send(opts(dmEmbed, {
         files: [{
           attachment: html,
           name: `${message.channel.name || 'transcript'}-${Date.now()}.html`,
         }],
-      });
+      }));
 
       // Success — auto-deleting confirmation in channel
-      return sendTempReply(message, {
-        embeds: [responseBuilder.buildResult({ description: '✅ Transcript sent to your DMs.'})],
-      });
+      return sendTempReply(message, opts(
+        responseBuilder.buildResult({ description: '✅ Transcript sent to your DMs.'}),
+      ));
     } catch {
       // DMs likely closed
-      return sendTempReply(message, {
-        embeds: [responseBuilder.buildResult({ description: "❌ Couldn't DM you the transcript — please enable DMs from server members and try again."})],
-      });
+      return sendTempReply(message, opts(
+        responseBuilder.buildResult({ description: "❌ Couldn't DM you the transcript — please enable DMs from server members and try again."}),
+      ));
     }
   },
 };

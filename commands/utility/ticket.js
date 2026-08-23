@@ -1,6 +1,7 @@
 const responseBuilder = require('../../utils/responseBuilder');
 // src/commands/utility/ticket.js
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits, ComponentType } = require('discord.js');
+const { opts, buildContainer } = require('../../utils/v2Reply');
 
 module.exports = {
   name: 'ticket',
@@ -17,7 +18,7 @@ module.exports = {
       new ButtonBuilder().setCustomId('ticket_create').setLabel('Open Ticket').setStyle(ButtonStyle.Primary).setEmoji('\uD83C\uDFAB')
     );
 
-    const sent = await message.reply({ embeds: [embed], components: [row] });
+    const sent = await message.reply(opts(embed.addActionRowComponents(row)));
 
     const collector = sent.createMessageComponentCollector({ componentType: ComponentType.Button, time: 86400000 }); // 24h timeout to prevent memory leak
 
@@ -32,10 +33,10 @@ module.exports = {
       const existing = message.guild.channels.cache.find(c =>
         c.name.includes(`ticket-${slug}`)
       );
-      if (existing) return i.editReply({ content: 'You already have an open ticket.' });
+      if (existing) return i.editReply(opts(buildContainer({ description: 'You already have an open ticket.' })));
 
       // Check channel limit (Discord allows 500 channels per guild)
-      if (message.guild.channels.cache.size >= 500) return i.editReply({ content: 'Max channel limit reached.' });
+      if (message.guild.channels.cache.size >= 500) return i.editReply(opts(buildContainer({ description: 'Max channel limit reached.' })));
 
       let ch;
       try {
@@ -50,7 +51,7 @@ module.exports = {
           ],
         });
       } catch (createErr) {
-        return i.editReply({ content: `Failed to create ticket channel: ${createErr.message}` });
+        return i.editReply(opts(buildContainer({ description: `Failed to create ticket channel: ${createErr.message}` })));
       }
 
       const ticketEmbed = responseBuilder.buildResult({ title: `\uD83C\uDFAB Ticket — ${topic}`, description: `<@${i.user.id}>'s ticket.\nStaff will assist shortly.`});
@@ -59,19 +60,19 @@ module.exports = {
         new ButtonBuilder().setCustomId('ticket_close').setLabel('Close').setStyle(ButtonStyle.Danger)
       );
 
-      const msg = await ch.send({ embeds: [ticketEmbed], components: [closeRow] });
+      const msg = await ch.send(opts(ticketEmbed.addActionRowComponents(closeRow)));
 
       // Close collector
       msg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 86400000 }) // 24h
         .on('collect', async (ci) => {
           if (!ci.member.permissions.has(PermissionFlagsBits.ManageChannels) && ci.user.id !== i.user.id) {
-            return ci.reply({ content: 'You do not have permission to close this ticket.', ephemeral: true });
+            return ci.reply(opts(buildContainer({ description: 'You do not have permission to close this ticket.' }), { ephemeral: true }));
           }
           await ci.deferUpdate();
           try { await ch.delete('Ticket closed.'); } catch {}
         });
 
-      try { await i.editReply({ content: `Ticket created: ${ch}` }); } catch {}
+      try { await i.editReply(opts(buildContainer({ description: `Ticket created: ${ch}` }))); } catch {}
     });
   },
 };

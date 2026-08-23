@@ -1,4 +1,5 @@
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts } = require('../../utils/v2Reply');
 // src/commands/moderation/unlockall.js
 
 const { PermissionFlagsBits } = require('discord.js');
@@ -17,7 +18,7 @@ module.exports = {
       const ow = c.permissionOverwrites.cache.get(everyone.id);
       return ow && ow.deny.has(PermissionFlagsBits.SendMessages);
     });
-    if (!channels.size) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'No locked text channels found.'})] });
+    if (!channels.size) return message.reply(opts(responseBuilder.buildResult({ description: 'No locked text channels found.'})));
     let count = 0;
     for (const ch of channels.values()) {
       try {
@@ -25,6 +26,6 @@ module.exports = {
         count++;
       } catch { /* skip */ }
     }
-    return message.reply({ embeds: [responseBuilder.buildResult({ description: `🔓 Unlocked ${count} text channel(s).`})] });
+    return message.reply(opts(responseBuilder.buildResult({ description: `🔓 Unlocked ${count} text channel(s).`})));
   },
 };

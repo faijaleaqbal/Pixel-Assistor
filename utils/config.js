@@ -20,8 +20,14 @@ module.exports = {
 
   prefix: process.env.PREFIX || '?',
   defaultCooldown: toInt(process.env.DEFAULT_COOLDOWN, 3),
-  embedColor: parseInt(process.env.EMBED_COLOR || '5865F2', 16),
+  embedColor: parseInt(process.env.EMBED_COLOR || '7C3AED', 16),
   helpFooterName: process.env.HELP_FOOTER_NAME || '',
+  helpEmojis: {
+    spacer: process.env.EMOJI_SPACER || '',
+    chevron: process.env.EMOJI_CHEVRON || '➜',
+    automod: process.env.EMOJI_AUTOMOD || '🤖',
+    king: process.env.EMOJI_KING || '👑',
+  },
 
   // DB: SQLite handles ALL data. MongoDB is optional (preferred if available).
   sqlitePath: process.env.DB_SQLITE_PATH || './data/bot.db',

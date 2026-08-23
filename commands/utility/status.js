@@ -2,6 +2,7 @@
 // Owner only. Set bot presence status.
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts, buildContainer } = require('../../utils/v2Reply');
 
 module.exports = {
   name: 'status',
@@ -18,12 +19,12 @@ module.exports = {
     if (!args[0]) {
       const embed = responseBuilder.buildResult({ title: '🟢 Current Status', fields: [{ name: 'Status', value: currentStatus, inline: true },
           { name: 'Activity', value: message.client.user.presence.activities[0]?.name || 'None', inline: true },]});
-      return message.reply({ embeds: [embed] });
+      return message.reply(opts(embed));
     }
 
     const statusInput = args[0].toLowerCase();
     if (!validStatuses.includes(statusInput)) {
-      return message.reply(`Invalid status. Choose from: ${validStatuses.join(', ')}`);
+      return message.reply(opts(buildContainer({ description: `Invalid status. Choose from: ${validStatuses.join(', ')}` })));
     }
 
     const customText = args.slice(1).join(' ');
@@ -37,6 +38,6 @@ module.exports = {
     const embed = responseBuilder.buildResult({ title: '✅ Status Updated', fields: [{ name: 'Status', value: statusInput, inline: true },
         { name: 'Custom Text', value: customText || 'None', inline: true },]});
 
-    return message.reply({ embeds: [embed] });
+    return message.reply(opts(embed));
   },
 };

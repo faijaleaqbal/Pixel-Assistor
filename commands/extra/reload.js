@@ -6,6 +6,7 @@
 // All three rely on an external supervisor — the bot itself never re-spawns.
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts } = require('../../utils/v2Reply');
 const config = require('../../utils/config');
 const { isOwner } = require('../../utils/perms');
 const logger = require('../../utils/logger');
@@ -21,7 +22,7 @@ module.exports = {
   async execute(message) {
     if (!isOwner(message.author.id)) return;
     const mgr = config.deployManager;
-    await message.reply({ embeds: [responseBuilder.buildResult({ description: `🔄 Restarting now (deploy manager: \`${mgr}\`). Back in a few seconds.`})] });
+    await message.reply(opts(responseBuilder.buildResult({ description: `🔄 Restarting now (deploy manager: \`${mgr}\`). Back in a few seconds.`})));
 
     logger.warn(`reload triggered by owner — manager=${mgr}`);
     // Give the reply a moment to flush.

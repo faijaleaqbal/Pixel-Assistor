@@ -1,6 +1,7 @@
 // src/commands/moderation/unslowmode.js
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts } = require('../../utils/v2Reply');
 
 module.exports = {
   name: 'unslowmode',
@@ -12,6 +13,6 @@ module.exports = {
   permissions: ['ManageChannels'],
   async execute(message) {
     await message.channel.setRateLimitPerUser(0);
-    return message.reply({ embeds: [responseBuilder.buildResult({ description: '🐇 Slowmode disabled.'})] });
+    return message.reply(opts(responseBuilder.buildResult({ description: '🐇 Slowmode disabled.'})));
   },
 };

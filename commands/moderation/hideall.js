@@ -1,6 +1,7 @@
 // src/commands/moderation/hideall.js
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts } = require('../../utils/v2Reply');
 
 module.exports = {
   name: 'hideall',
@@ -11,7 +12,7 @@ module.exports = {
   permissions: ['ManageChannels'],
   async execute(message) {
     const channels = message.guild.channels.cache.filter(c => c.isTextBased() && !c.isThread() && c.manageable);
-    if (!channels.size) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'No text channels found.'})] });
+    if (!channels.size) return message.reply(opts(responseBuilder.buildResult({ description: 'No text channels found.'})));
     let count = 0;
     for (const ch of channels.values()) {
       try {
@@ -19,6 +20,6 @@ module.exports = {
         count++;
       } catch { /* skip */ }
     }
-    return message.reply({ embeds: [responseBuilder.buildResult({ description: `🙈 Hidden ${count} text channel(s).`})] });
+    return message.reply(opts(responseBuilder.buildResult({ description: `🙈 Hidden ${count} text channel(s).`})));
   },
 };

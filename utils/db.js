@@ -123,13 +123,6 @@ function makeSqlite() {
       reason TEXT,
       at INTEGER
     );
-    CREATE TABLE IF NOT EXISTS levels (
-      userId TEXT NOT NULL,
-      guildId TEXT NOT NULL,
-      xp INTEGER DEFAULT 0,
-      level INTEGER DEFAULT 0,
-      PRIMARY KEY(userId, guildId)
-    );
     CREATE TABLE IF NOT EXISTS persist_role (
       userId TEXT NOT NULL,
       guildId TEXT NOT NULL,
@@ -471,27 +464,6 @@ function makeSqlite() {
         db.prepare('DELETE FROM warn WHERE guildId=?').run(guildId).changes,
     },
 
-    // ── Levels / XP ─────────────────────
-    level: {
-      get: (userId, guildId) => {
-        const r = db.prepare('SELECT xp, level FROM levels WHERE userId=? AND guildId=?').get(userId, guildId);
-        return r || { xp: 0, level: 0 };
-      },
-      addXp: (userId, guildId, xp) => {
-        db.prepare(`INSERT INTO levels (userId, guildId, xp, level) VALUES (?,?,?,0)
-          ON CONFLICT(userId, guildId) DO UPDATE SET xp=xp+excluded.xp`)
-          .run(userId, guildId, xp);
-        const r = db.prepare('SELECT xp, level FROM levels WHERE userId=? AND guildId=?').get(userId, guildId);
-        return r;
-      },
-      setLevel: (userId, guildId, level) =>
-        db.prepare(`INSERT INTO levels (userId, guildId, xp, level) VALUES (?,?,0,?)
-          ON CONFLICT(userId, guildId) DO UPDATE SET level=excluded.level`)
-          .run(userId, guildId, level),
-      top: (guildId, limit = 10) =>
-        db.prepare('SELECT userId, guildId, xp, level FROM levels WHERE guildId=? ORDER BY xp DESC LIMIT ?').all(guildId, limit),
-    },
-
     // ── Persist Roles ───────────────────
     persistRole: {
       get: (userId, guildId) => {
@@ -663,11 +635,6 @@ function makeMongo() {
     userId: String, guildId: String, moderatorId: String, reason: String, at: Number,
   }));
 
-  const Level = mongoose.models.Level || mongoose.model('Level', new Schema({
-    userId: String, guildId: String,
-    xp: { type: Number, default: 0 }, level: { type: Number, default: 0 },
-  }, { _id: false }));
-
   const PersistRole = mongoose.models.PersistRole || mongoose.model('PersistRole', new Schema({
     userId: String, guildId: String, roleIds: [String],
   }));
@@ -748,20 +715,6 @@ function makeMongo() {
       clearGuild: async (guildId) =>
         (await Warn.deleteMany({ guildId })).deletedCount,
     },
-    level: {
-      get: async (userId, guildId) => {
-        const r = await Level.findOne({ userId, guildId }).lean();
-        return r || { xp: 0, level: 0 };
-      },
-      addXp: async (userId, guildId, xp) => {
-        const r = await Level.findOneAndUpdate({ userId, guildId }, { $inc: { xp } }, { upsert: true, new: true }).lean();
-        return r || { xp: 0, level: 0 };
-      },
-      setLevel: async (userId, guildId, level) =>
-        Level.findOneAndUpdate({ userId, guildId }, { $set: { level } }, { upsert: true, new: true }).lean(),
-      top: async (guildId, limit = 10) =>
-        Level.find({ guildId }).sort({ xp: -1 }).limit(limit).lean(),
-    },
     persistRole: {
       get: async (userId, guildId) => {
         const r = await PersistRole.findOne({ userId, guildId }).lean();
@@ -839,7 +792,7 @@ function makeMongo() {
 //  Init & unified getDb()
 // ─────────────────────────────────────────────────────────────
 const ALL_NS = [
-  'antinuke', 'greet', 'guildConfig', 'warn', 'level',
+  'antinuke', 'greet', 'guildConfig', 'warn',
   'persistRole', 'reactionStat', 'rpsStat', 'crypto',
   'reminder', 'userReminder', 'timer', 'scheduled', 'transcript',
 ];

@@ -7,6 +7,7 @@ const responseBuilder = require('../../utils/responseBuilder');
 // The viewer must be running and VIEWER_BASE_URL must be configured in .env.
 
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { opts } = require('../../utils/v2Reply');
 const config = require('../../utils/config');
 const { getBuffer, request } = require('../../utils/http');
 
@@ -51,9 +52,7 @@ module.exports = {
   async execute(message) {
     // ── 0. Config check ──
     if (!config.viewerBaseUrl) {
-      return message.reply({
-        embeds: [responseBuilder.buildResult({ description: 'Viewer service is not configured. Set `VIEWER_BASE_URL` in `.env`.'})],
-      });
+      return message.reply(opts(responseBuilder.buildResult({ description: 'Viewer service is not configured. Set `VIEWER_BASE_URL` in `.env`.'})));
     }
 
     // ── 1. Find the HTML attachment ──
@@ -61,9 +60,7 @@ module.exports = {
     let htmlAttachment;
 
     if (!found) {
-      return message.reply({
-        embeds: [responseBuilder.buildResult({ description: 'No `.html` file found. Attach an HTML file to your message, or reply to a message that has one attached.'})],
-      });
+      return message.reply(opts(responseBuilder.buildResult({ description: 'No `.html` file found. Attach an HTML file to your message, or reply to a message that has one attached.'})));
     }
 
     if (found.fetchFromReference) {
@@ -72,28 +69,20 @@ module.exports = {
         const channel = message.client.channels.cache.get(found.channelId)
           || await message.client.channels.fetch(found.channelId).catch(() => null);
         if (!channel) {
-          return message.reply({
-            embeds: [responseBuilder.buildResult({ description: 'Could not find the referenced channel.'})],
-          });
+          return message.reply(opts(responseBuilder.buildResult({ description: 'Could not find the referenced channel.'})));
         }
         const refMsg = await channel.messages.fetch(found.fetchFromReference).catch(() => null);
         if (!refMsg) {
-          return message.reply({
-            embeds: [responseBuilder.buildResult({ description: 'Could not find the referenced message.'})],
-          });
+          return message.reply(opts(responseBuilder.buildResult({ description: 'Could not find the referenced message.'})));
         }
         htmlAttachment = refMsg.attachments.find(a =>
           a.name && a.name.toLowerCase().endsWith('.html')
         );
         if (!htmlAttachment) {
-          return message.reply({
-            embeds: [responseBuilder.buildResult({ description: 'The referenced message does not have an `.html` file attached.'})],
-          });
+          return message.reply(opts(responseBuilder.buildResult({ description: 'The referenced message does not have an `.html` file attached.'})));
         }
       } catch (e) {
-        return message.reply({
-          embeds: [responseBuilder.buildResult({ description: `Failed to fetch the referenced message: ${e.message}`})],
-        });
+        return message.reply(opts(responseBuilder.buildResult({ description: `Failed to fetch the referenced message: ${e.message}`})));
       }
     } else {
       htmlAttachment = found.attachment;
@@ -102,9 +91,7 @@ module.exports = {
     // ── 2. Download the HTML content as a buffer ──
     const htmlBuffer = await fetchAttachmentBuffer(htmlAttachment.url);
     if (!htmlBuffer || htmlBuffer.length === 0) {
-      return message.reply({
-        embeds: [responseBuilder.buildResult({ description: 'Failed to download the HTML file. The attachment may have expired or is too large.'})],
-      });
+      return message.reply(opts(responseBuilder.buildResult({ description: 'Failed to download the HTML file. The attachment may have expired or is too large.'})));
     }
 
     // ── 3. POST raw buffer to the viewer service ──
@@ -122,17 +109,13 @@ module.exports = {
 
       uploadResult = await res.json();
     } catch (e) {
-      return message.reply({
-        embeds: [responseBuilder.buildResult({ description: `Viewer service error: ${e.message}`})],
-      });
+      return message.reply(opts(responseBuilder.buildResult({ description: `Viewer service error: ${e.message}`})));
     }
 
     // ── 4. Reply with the link ──
     const viewerUrl = uploadResult.url;
     if (!viewerUrl) {
-      return message.reply({
-        embeds: [responseBuilder.buildResult({ description: 'Viewer service returned an unexpected response (no URL).'})],
-      });
+      return message.reply(opts(responseBuilder.buildResult({ description: 'Viewer service returned an unexpected response (no URL).'})));
     }
 
     const embed = responseBuilder.buildResult({ title: '📄 HTML File Hosted', fields: [{ name: 'File', value: `\`${htmlAttachment.name}\``, inline: true },
@@ -146,10 +129,6 @@ module.exports = {
         .setURL(viewerUrl),
     );
 
-    return message.reply({
-      embeds: [embed],
-      components: [row],
-      allowedMentions: { parse: [] },
-    });
+    return message.reply(opts(embed.addActionRowComponents(row), { allowedMentions: { parse: [] } }));
   },
 };

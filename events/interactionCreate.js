@@ -4,6 +4,11 @@
 const logger = require('../utils/logger');
 const { executeSlashCommand } = require('../handlers/commandPipeline');
 const { safeReply } = require('../utils/interactionHelper');
+const { buildContainer, opts } = require('../utils/v2Reply');
+
+function v2Err(text) {
+  return opts(buildContainer({ description: text, color: '#ED4245' }), { ephemeral: true });
+}
 
 module.exports = {
   name: 'interactionCreate',
@@ -15,10 +20,7 @@ module.exports = {
       if (interaction.isChatInputCommand()) {
         const cmd = client.commands?.get(interaction.commandName);
         if (!cmd) {
-          return safeReply(interaction, {
-            content: '❌ This command is no longer registered.',
-            ephemeral: true,
-          });
+          return safeReply(interaction, v2Err('❌ This command is no longer registered.'));
         }
         await executeSlashCommand(cmd, interaction, client);
         return;
@@ -49,12 +51,12 @@ module.exports = {
         // Copy UPI ID button
         if (id.startsWith('copy_upi_')) {
           const upiId = id.slice('copy_upi_'.length);
-          return safeReply(interaction, { content: `\`${upiId}\``, ephemeral: true });
+          return safeReply(interaction, opts(buildContainer({ description: `\`${upiId}\``, color: '#5865F2' }), { ephemeral: true }));
         }
 
         // Expired/unhandled button
         if (!interaction.deferred && !interaction.replied) {
-          await safeReply(interaction, { content: 'ℹ️ This button interaction has expired.', ephemeral: true });
+          await safeReply(interaction, v2Err('ℹ️ This button interaction has expired.'));
         }
         return;
       }
@@ -83,10 +85,7 @@ module.exports = {
     } catch (e) {
       logger.error('interactionCreate router error', e?.stack || e?.message || e);
       try {
-        await safeReply(interaction, {
-          content: '❌ An unexpected error occurred while processing this interaction.',
-          ephemeral: true,
-        });
+        await safeReply(interaction, v2Err('❌ An unexpected error occurred while processing this interaction.'));
       } catch { /* ignore secondary failure */ }
     }
   },

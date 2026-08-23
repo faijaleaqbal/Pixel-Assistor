@@ -5,6 +5,7 @@ const responseBuilder = require('../../utils/responseBuilder');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 const config = require('../../utils/config');
 const { resolveUserArg } = require('../../utils/resolveUser');
+const { opts, buildContainer } = require('../../utils/v2Reply');
 
 const SYMBOLS = { X: '❌', O: '⭕', EMPTY: '⬜' };
 const WIN_LINES = [
@@ -25,7 +26,7 @@ module.exports = {
     const opponent = await resolveUserArg(message, args[0]);
     if (!opponent) return;
     if (opponent.bot || opponent.id === message.author.id) {
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: `Mention a valid opponent.\nUsage: \`${config.prefix}tictactoe <@user|userID>\``})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: `Mention a valid opponent.\nUsage: \`${config.prefix}tictactoe <@user|userID>\``})));
     }
 
     const board = Array(9).fill(null);
@@ -55,13 +56,16 @@ module.exports = {
 
     const embed = () => responseBuilder.buildResult({ title: '❌⭕ Tic-Tac-Toe', description: `<@${players.X}> (❌) vs <@${players.O}> (⭕)\nTurn: <@${turn}>`});
 
-    const sent = await message.reply({ embeds: [embed()], components: mkRows(), allowedMentions: { parse: [] } });
+    // Fresh container + rows on every render so no stored instance is mutated across turns.
+    const renderBoard = () => embed().addActionRowComponents(...mkRows());
+
+    const sent = await message.reply(opts(renderBoard(), { allowedMentions: { parse: [] } }));
 
     const collector = sent.createMessageComponentCollector({ componentType: ComponentType.Button, time: 60000 });
     collector.on('collect', async (i) => {
       try {
         if (i.user.id !== turn) {
-          return i.reply({ content: 'Not your turn.', ephemeral: true });
+          return i.reply(opts(buildContainer({ description: 'Not your turn.', color: '#ED4245' }), { ephemeral: true }));
         }
         const idx = parseInt(i.customId.replace('ttt_', ''), 10);
         const symbol = turn === players.X ? 'X' : 'O';
@@ -70,21 +74,21 @@ module.exports = {
         const w = checkWin(board);
         if (w) {
           collector.stop('win');
-          await i.update({ embeds: [winEmbed(message.author, opponent, w === 'X' ? message.author.id : opponent.id)], components: mkRowsFinal(board, w) });
+          await i.update(opts(winEmbed(message.author, opponent, w === 'X' ? message.author.id : opponent.id).addActionRowComponents(...mkRowsFinal(board, w))));
           return;
         }
         if (board.every(Boolean)) {
           collector.stop('draw');
-          await i.update({ embeds: [responseBuilder.buildResult({ title: 'Tic-Tac-Toe — Draw!', description: 'No winner.'})], components: mkRowsFinal(board) });
+          await i.update(opts(responseBuilder.buildResult({ title: 'Tic-Tac-Toe — Draw!', description: 'No winner.'}).addActionRowComponents(...mkRowsFinal(board))));
           return;
         }
         turn = turn === players.X ? players.O : players.X;
-        await i.update({ embeds: [embed()], components: mkRows() });
+        await i.update(opts(renderBoard()));
       } catch (e) { console.error('[ttt] collector error:', e.message); }
     });
     collector.on('end', async (_c, reason) => {
       if (reason !== 'win' && reason !== 'draw') {
-        await sent.edit({ embeds: [responseBuilder.buildResult({ title: 'Tic-Tac-Toe — timed out'})], components: [] }).catch(() => {});
+        await sent.edit(opts(responseBuilder.buildResult({ title: 'Tic-Tac-Toe — timed out'}))).catch(() => {});
       }
     });
   },

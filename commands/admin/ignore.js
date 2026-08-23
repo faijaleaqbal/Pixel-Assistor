@@ -11,6 +11,7 @@
 //   ?ignore bypass user add|remove|show <@user>
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts } = require('../../utils/v2Reply');
 const { getDb } = require('../../utils/db');
 const { resolveUserArg } = require('../../utils/resolveUser');
 
@@ -38,12 +39,12 @@ module.exports = {
       for (const t of [...TYPES, 'bypass_channel', 'bypass_user']) {
         try { counts[t] = (await db.ignored.list(gid, t)).length; } catch { counts[t] = 0; }
       }
-      return message.reply({ embeds: [responseBuilder.buildResult({ title: 'Ignore Summary', description: '**Channels:** ' + counts.channel + ' ignored\n' +
+      return message.reply(opts(responseBuilder.buildResult({ title: 'Ignore Summary', description: '**Channels:** ' + counts.channel + ' ignored\n' +
         '**Users:** ' + counts.user + ' ignored\n' +
         '**Commands:** ' + counts.command + ' ignored\n' +
         '**Modules:** ' + counts.module + ' ignored\n' +
         '**Bypass Channels:** ' + counts.bypass_channel + '\n' +
-        '**Bypass Users:** ' + counts.bypass_user})] });
+        '**Bypass Users:** ' + counts.bypass_user})));
     }
 
     const sub = args[0].toLowerCase();
@@ -51,12 +52,12 @@ module.exports = {
     // ── Bypass sub-group ──
     if (sub === 'bypass') {
       const bType = args[1]?.toLowerCase();
-      if (!bType || !BYPASS_TYPES[bType]) return message.reply({ embeds: [E(RED, 'Bypass sub-types: `channel`, `user`.')] });
+      if (!bType || !BYPASS_TYPES[bType]) return message.reply(opts(E(RED, 'Bypass sub-types: `channel`, `user`.')));
       return handleType(message, args.slice(2), gid, db, BYPASS_TYPES[bType], bType);
     }
 
     // ── Standard types ──
-    if (!TYPES.includes(sub)) return message.reply({ embeds: [E(RED, 'Unknown type. Use `channel`, `user`, `command`, `module`, or `bypass`.')] });
+    if (!TYPES.includes(sub)) return message.reply(opts(E(RED, 'Unknown type. Use `channel`, `user`, `command`, `module`, or `bypass`.')));
     return handleType(message, args.slice(1), gid, db, sub, sub);
   },
 };
@@ -68,46 +69,46 @@ async function handleType(message, args, gid, db, dbType, label) {
   if (action === 'show' || !action) {
     let items;
     try { items = await db.ignored.list(gid, dbType); } catch { items = []; }
-    if (!items || !items.length) return message.reply({ embeds: [E(BLUE, 'No ignored **' + label + '** entries.')] });
+    if (!items || !items.length) return message.reply(opts(E(BLUE, 'No ignored **' + label + '** entries.')));
     const lines = items.map((target, i) => (i + 1) + '. ' + target).join('\n');
-    return message.reply({ embeds: [responseBuilder.buildResult({ title: 'Ignored ' + label + 's (' + items.length + ')', description: lines})] });
+    return message.reply(opts(responseBuilder.buildResult({ title: 'Ignored ' + label + 's (' + items.length + ')', description: lines})));
   }
 
   if (action === 'add') {
     let target;
     if (dbType === 'channel' || dbType === 'bypass_channel') {
       const ch = message.mentions.channels.first();
-      if (!ch) return message.reply({ embeds: [E(RED, 'Mention a channel.')] });
+      if (!ch) return message.reply(opts(E(RED, 'Mention a channel.')));
       target = ch.id;
     } else if (dbType === 'user' || dbType === 'bypass_user') {
       const user = await resolveUserArg(message, args[1], { silent: true });
-      if (!user) return message.reply({ embeds: [E(RED, 'Mention a user or paste their raw user ID.')] });
+      if (!user) return message.reply(opts(E(RED, 'Mention a user or paste their raw user ID.')));
       target = user.id;
     } else {
       target = args[1]?.toLowerCase();
-      if (!target) return message.reply({ embeds: [E(RED, 'Provide a name to ignore.')] });
+      if (!target) return message.reply(opts(E(RED, 'Provide a name to ignore.')));
     }
     await db.ignored.add(gid, dbType, target);
-    return message.reply({ embeds: [E(GREEN, '✅ `' + target + '` added to ignored **' + label + '**.')] });
+    return message.reply(opts(E(GREEN, '✅ `' + target + '` added to ignored **' + label + '**.')));
   }
 
   if (action === 'remove') {
     let target;
     if (dbType === 'channel' || dbType === 'bypass_channel') {
       const ch = message.mentions.channels.first();
-      if (!ch) return message.reply({ embeds: [E(RED, 'Mention a channel.')] });
+      if (!ch) return message.reply(opts(E(RED, 'Mention a channel.')));
       target = ch.id;
     } else if (dbType === 'user' || dbType === 'bypass_user') {
       const user = await resolveUserArg(message, args[1], { silent: true });
-      if (!user) return message.reply({ embeds: [E(RED, 'Mention a user or paste their raw user ID.')] });
+      if (!user) return message.reply(opts(E(RED, 'Mention a user or paste their raw user ID.')));
       target = user.id;
     } else {
       target = args[1]?.toLowerCase();
-      if (!target) return message.reply({ embeds: [E(RED, 'Provide a name to unignore.')] });
+      if (!target) return message.reply(opts(E(RED, 'Provide a name to unignore.')));
     }
     await db.ignored.remove(gid, dbType, target);
-    return message.reply({ embeds: [E(GREEN, '✅ `' + target + '` removed from ignored **' + label + '**.')] });
+    return message.reply(opts(E(GREEN, '✅ `' + target + '` removed from ignored **' + label + '**.')));
   }
 
-  return message.reply({ embeds: [E(RED, 'Sub-commands: `add`, `remove`, `show`.')] });
+  return message.reply(opts(E(RED, 'Sub-commands: `add`, `remove`, `show`.')));
 }

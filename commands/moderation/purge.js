@@ -1,4 +1,5 @@
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts, buildContainer } = require('../../utils/v2Reply');
 // src/commands/moderation/purge.js
 // Production-grade Purge Command.
 // Deletes exact requested number of eligible messages, handles 100-msg batching,
@@ -131,17 +132,13 @@ module.exports = {
 
   async execute(message, args, client) {
     if (!message.guild || !message.channel) {
-      return message.reply({ content: '❌ The `purge` command can only be used in a server text channel.' });
+      return message.reply(opts(buildContainer({ description: '❌ The `purge` command can only be used in a server text channel.', color: '#ED4245' })));
     }
 
     // ── 1. Check User Permissions ──
     const userPerms = message.channel.permissionsFor(message.member);
     if (!userPerms || !userPerms.has(PermissionsBitField.Flags.ManageMessages)) {
-      return message.reply({
-        embeds: [
-          responseBuilder.buildResult({ description: '❌ You need the **Manage Messages** permission to use this command.'}),
-        ],
-      });
+      return message.reply(opts(responseBuilder.buildResult({ description: '❌ You need the **Manage Messages** permission to use this command.'})));
     }
 
     // ── 2. Check Bot Permissions in this Channel ──
@@ -149,19 +146,11 @@ module.exports = {
     const botPerms = message.channel.permissionsFor(botMember);
 
     if (!botPerms || !botPerms.has(PermissionsBitField.Flags.ManageMessages)) {
-      return message.reply({
-        embeds: [
-          responseBuilder.buildResult({ description: '❌ I do not have the **Manage Messages** permission in this channel.'}),
-        ],
-      });
+      return message.reply(opts(responseBuilder.buildResult({ description: '❌ I do not have the **Manage Messages** permission in this channel.'})));
     }
 
     if (!botPerms.has(PermissionsBitField.Flags.ReadMessageHistory)) {
-      return message.reply({
-        embeds: [
-          responseBuilder.buildResult({ description: '❌ I need the **Read Message History** permission to purge messages.'}),
-        ],
-      });
+      return message.reply(opts(responseBuilder.buildResult({ description: '❌ I need the **Read Message History** permission to purge messages.'})));
     }
 
     // ── 3. Parse Subcommand & Target ──
@@ -181,11 +170,7 @@ module.exports = {
     } else if (sub === 'user') {
       const targetUser = message.mentions.users.first() || (args[1] ? { id: args[1].replace(/[<@!>]/g, '') } : null);
       if (!targetUser || !targetUser.id) {
-        return message.reply({
-          embeds: [
-            responseBuilder.buildResult({ title: '❌ Invalid Target User', description: 'Usage: `?purge user <@user> <amount|all>`'}),
-          ],
-        });
+        return message.reply(opts(responseBuilder.buildResult({ title: '❌ Invalid Target User', description: 'Usage: `?purge user <@user> <amount|all>`'})));
       }
       filterFn = (m) => m.author?.id === targetUser.id;
       filterLabel = `user (<@${targetUser.id}>) `;
@@ -203,33 +188,16 @@ module.exports = {
       count = Infinity;
     } else {
       if (!/^\d+$/.test(countArg)) {
-        return message.reply({
-          embeds: [
-            responseBuilder.buildResult({ title: '❌ Invalid Amount', description: '❌ Please provide a positive whole number (e.g. `?purge 20`) or `all`.\n\n' +
-                '**Syntax Options:**\n' +
-                '• `?purge <amount|all>` — Delete recent messages\n' +
-                '• `?purge human <amount|all>` — Delete human messages only\n' +
-                '• `?purge bot <amount|all>` — Delete bot messages only\n' +
-                '• `?purge user <@user> <amount|all>` — Delete specific user messages'}),
-          ],
-        });
+        return message.reply(opts(responseBuilder.buildResult({ title: '❌ Invalid Amount', description: '❌ Please provide a positive whole number (e.g. `?purge 20`) or `all`.\n\n' + '**Syntax Options:**\n' + '• `?purge <amount|all>` — Delete recent messages\n' + '• `?purge human <amount|all>` — Delete human messages only\n' + '• `?purge bot <amount|all>` — Delete bot messages only\n' + '• `?purge user <@user> <amount|all>` — Delete specific user messages'})));
       }
 
       count = parseInt(countArg, 10);
       if (!Number.isInteger(count) || count < 1) {
-        return message.reply({
-          embeds: [
-            responseBuilder.buildResult({ description: '❌ Amount must be at least **1**.'}),
-          ],
-        });
+        return message.reply(opts(responseBuilder.buildResult({ description: '❌ Amount must be at least **1**.'})));
       }
 
       if (count > MAX_PURGE_LIMIT) {
-        return message.reply({
-          embeds: [
-            responseBuilder.buildResult({ description: `❌ Maximum single purge amount is **${MAX_PURGE_LIMIT}** (or use \`?purge all\`).`}),
-          ],
-        });
+        return message.reply(opts(responseBuilder.buildResult({ description: `❌ Maximum single purge amount is **${MAX_PURGE_LIMIT}** (or use \`?purge all\`).`})));
       }
     }
 
@@ -246,7 +214,7 @@ module.exports = {
         : `ℹ️ No ${filterLabel}messages found to delete.`;
       return sendTempConfirmation(
         message.channel,
-        { embeds: [responseBuilder.buildResult({ description: note})] },
+        opts(responseBuilder.buildResult({ description: note})),
         5000
       );
     }
@@ -258,7 +226,7 @@ module.exports = {
 
     return sendTempConfirmation(
       message.channel,
-      { embeds: [responseBuilder.buildResult({ description: confirmText})] },
+      opts(responseBuilder.buildResult({ description: confirmText})),
       5000
     );
   },

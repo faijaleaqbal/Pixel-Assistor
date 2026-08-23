@@ -1,9 +1,8 @@
 // src/commands/utility/help.js
 // Help command — Rainy Assistant style UI redesign for Pixel Assistant.
-// Clean, compact, paginated Discord embed interface with dropdown navigation.
+// Clean, compact, paginated Components V2 interface with dropdown navigation.
 
 const {
-  EmbedBuilder,
   ActionRowBuilder,
   StringSelectMenuBuilder,
   ButtonBuilder,
@@ -17,29 +16,23 @@ const { getPrefix } = require('../../utils/prefixCache');
 const logger = require('../../utils/logger');
 const subs = require('../../utils/subcommands');
 const { safeUpdate } = require('../../utils/interactionHelper');
+const responseBuilder = require('../../utils/responseBuilder');
+const { opts, buildContainer } = require('../../utils/v2Reply');
 
 // State map: messageId -> { userId, username, category, page, total, prefix }
 const state = new Map();
 
 const COMMANDS_PER_PAGE = 7;
-
-function formatFooterDate(d = new Date()) {
-  const day = d.getUTCDate();
-  const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
-  ];
-  const month = months[d.getUTCMonth()];
-  const year = d.getUTCFullYear();
-  const hours = String(d.getUTCHours()).padStart(2, '0');
-  const minutes = String(d.getUTCMinutes()).padStart(2, '0');
-  return `${day} ${month} ${year} ${hours}:${minutes}`;
-}
+const HELP_COLOR = config.embedColor || 0x7C3AED;
 
 function makeFooter() {
-  return {
-    text: `Developed by Pixel Assistant • ${formatFooterDate()}`,
-  };
+  const devName = config.helpFooterName || 'Developer';
+  return `-# Developed by ${devName}`;
+}
+
+// Attaches the dropdown + pagination rows INSIDE a V2 container and wraps in payload opts.
+function withRows(container, cat, page, totalPages, extra = {}) {
+  return opts(container.addActionRowComponents(...makeRows(cat, page, totalPages)), extra);
 }
 
 function compactDescription(str, max = 80) {
@@ -63,8 +56,8 @@ module.exports = {
       required: false,
     },
   ],
-  buildHomeEmbed,
-  buildCategoryEmbed,
+  buildHomeContent,
+  buildCategoryContent,
   buildCommandDetailEmbed,
   getAvailableCategories,
   calcTotalPages,
@@ -78,22 +71,17 @@ module.exports = {
     if (args[0]) {
       const m = meta.get(args[0].toLowerCase());
       if (!m) {
-        return message.reply({
-          embeds: [
-            err(`No command found matching \`${args[0]}\`.\nType \`${currentPrefix}help\` to browse all categories.`),
-          ],
-        });
+        return message.reply(opts(
+          err(`No command found matching \`${args[0]}\`.\nType \`${currentPrefix}help\` to browse all categories.`),
+        ));
       }
-      return message.reply({
-        embeds: [buildCommandDetailEmbed(m, currentPrefix)],
-      });
+      return message.reply(opts(buildCommandDetailEmbed(m, currentPrefix)));
     }
 
     // ?help -> Home overview
     const user = message.author;
-    const home = buildHomeEmbed(client, currentPrefix, user);
-    const rows = makeRows(null, 0, 1);
-    const sent = await message.reply({ embeds: [home], components: rows });
+    const home = buildHomeContent(client, currentPrefix, user);
+    const sent = await message.reply(withRows(home, null, 0, 1));
 
     state.set(sent.id, {
       userId: user.id,
@@ -117,18 +105,17 @@ module.exports = {
     if (cmdName) {
       const m = meta.get(cmdName.toLowerCase());
       if (!m) {
-        return interaction.reply({
-          embeds: [err(`No command found matching \`${cmdName}\`.\nUse \`/help\` to browse all categories.`)],
-          ephemeral: true,
-        });
+        return interaction.reply(opts(
+          err(`No command found matching \`${cmdName}\`.\nUse \`/help\` to browse all categories.`),
+          { ephemeral: true },
+        ));
       }
-      return interaction.reply({ embeds: [buildCommandDetailEmbed(m, currentPrefix)] });
+      return interaction.reply(opts(buildCommandDetailEmbed(m, currentPrefix)));
     }
 
     const user = interaction.user;
-    const home = buildHomeEmbed(client, currentPrefix, user);
-    const rows = makeRows(null, 0, 1);
-    const sent = await interaction.reply({ embeds: [home], components: rows, fetchReply: true });
+    const home = buildHomeContent(client, currentPrefix, user);
+    const sent = await interaction.reply(withRows(home, null, 0, 1, { fetchReply: true }));
 
     state.set(sent.id, {
       userId: user.id,
@@ -152,10 +139,10 @@ module.exports = {
 
       // Security check: only the invoking user may control this menu
       if (st && st.userId && st.userId !== interaction.user.id) {
-        return interaction.reply({
-          content: "This Help Menu isn't yours.",
-          ephemeral: true,
-        });
+        return interaction.reply(opts(
+          buildContainer({ description: "This Help Menu isn't yours.", color: '#ED4245' }),
+          { ephemeral: true },
+        ));
       }
 
       if (!st) {
@@ -177,11 +164,8 @@ module.exports = {
           st.category = null;
           st.page = 0;
           st.total = 1;
-          const homeEmbed = buildHomeEmbed(client, currentPrefix, interaction.user);
-          return safeUpdate(interaction, {
-            embeds: [homeEmbed],
-            components: makeRows(null, 0, 1),
-          });
+          const homeContent = buildHomeContent(client, currentPrefix, interaction.user);
+          return safeUpdate(interaction, withRows(homeContent, null, 0, 1));
         }
 
         const totalPages = calcTotalPages(selected);
@@ -191,11 +175,8 @@ module.exports = {
         st.prefix = currentPrefix;
         state.set(messageId, st);
 
-        const catEmbed = buildCategoryEmbed(client, selected, 0, totalPages, currentPrefix);
-        return safeUpdate(interaction, {
-          embeds: [catEmbed],
-          components: makeRows(selected, 0, totalPages),
-        });
+        const catContent = buildCategoryContent(client, selected, 0, totalPages, currentPrefix);
+        return safeUpdate(interaction, withRows(catContent, selected, 0, totalPages));
       }
 
       // Buttons clicked (First / Prev / Next / Last / Home)
@@ -208,11 +189,8 @@ module.exports = {
           st.total = 1;
           state.set(messageId, st);
 
-          const homeEmbed = buildHomeEmbed(client, currentPrefix, interaction.user);
-          return safeUpdate(interaction, {
-            embeds: [homeEmbed],
-            components: makeRows(null, 0, 1),
-          });
+          const homeContent = buildHomeContent(client, currentPrefix, interaction.user);
+          return safeUpdate(interaction, withRows(homeContent, null, 0, 1));
         }
 
         const totalPages = calcTotalPages(st.category);
@@ -229,26 +207,23 @@ module.exports = {
         }
 
         state.set(messageId, st);
-        const catEmbed = buildCategoryEmbed(client, st.category, st.page, totalPages, currentPrefix);
-        return safeUpdate(interaction, {
-          embeds: [catEmbed],
-          components: makeRows(st.category, st.page, totalPages),
-        });
+        const catContent = buildCategoryContent(client, st.category, st.page, totalPages, currentPrefix);
+        return safeUpdate(interaction, withRows(catContent, st.category, st.page, totalPages));
       }
     } catch (e) {
       logger.error('help interaction error', e?.message || e);
       if (!interaction.replied && !interaction.deferred) {
-        await interaction.reply({
-          content: 'Help menu error: ' + (e?.message || 'unknown'),
-          ephemeral: true,
-        }).catch(() => {});
+        await interaction.reply(opts(
+          buildContainer({ description: 'Help menu error: ' + (e?.message || 'unknown'), color: '#ED4245' }),
+          { ephemeral: true },
+        )).catch(() => {});
       }
     }
   },
 };
 
 // ─────────────────────────────────────────────────────────────
-//  Embed Builders
+//  Container Builders (Components V2)
 // ─────────────────────────────────────────────────────────────
 
 function getAvailableCategories() {
@@ -262,41 +237,41 @@ function calcTotalPages(cat) {
 }
 
 /**
- * Builds the Home Help Embed matching Rainy Assistant reference style.
+ * Builds the Home Help page as a Components V2 container (Rainy Assistant style).
+ * Uses "# " H1, "-# " subtext markdown, custom emojis, and a dynamic <t:unix:f> timestamp.
  */
-function buildHomeEmbed(client, prefix, user) {
+function buildHomeContent(client, prefix, user) {
   const totalCmds = meta.total();
-  const availableCats = getAvailableCategories();
-  const totalCats = availableCats.length;
-  const username = user?.username || 'there';
-  const greeting = user?.id ? `Hey <@${user.id}>!` : `Hey **${username}**!`;
+  const totalCats = getAvailableCategories().length;
+  const botName = client?.user?.username || 'Pixel-Assistor';
   const devName = config.helpFooterName || 'Developer';
-  const timestamp = Math.floor(Date.now() / 1000);
+  const E = config.helpEmojis;
+  const ts = Math.floor(Date.now() / 1000);
 
-  const desc = [
-    `🤖 **Type **${prefix}help** for more Info**\n`,
-    `«Total Commands: **${totalCmds}** | Categories: **${totalCats}**»\n`,
-    `━━━━━━━━━━━━━━━━━━━━\n`,
-    `👑 **${greeting}**\n`,
-    `I'm *Pixel-Assistor*, your friendly companion.\n`,
-    `Prefix for this server: **${prefix}**\n`,
-    `Pick from the menu below to continue!`,
-    '',
-    `-# Developed by **${devName}** • <t:${timestamp}:f>`,
+  const userLine = user?.id
+    ? `**[${user.username || 'there'}](https://discord.com/users/${user.id})**`
+    : `**${user?.username || 'there'}**`;
+
+  const body = [
+    '### Help Menu',
+    `${E.automod} Type **${prefix}help** for more Info`,
+    `-# ${E.spacer}${E.chevron} Total Commands: **${totalCmds}**`,
+    `-# ${E.spacer}${E.chevron} Categories: **${totalCats}**`,
+    `${E.king} Hey ${userLine}!`,
+    `I'm *${botName}*, your friendly companion.`,
+    `-# ${E.spacer} Prefix for this server: **${prefix}**`,
+    `-# ${E.spacer} Pick from the menu below to continue!`,
+    `-# Developed by ${devName} • <t:${ts}:f>`,
   ].join('\n');
 
-  const embed = new EmbedBuilder()
-    .setColor(config.embedColor || 0x5865F2)
-    .setTitle('Help Menu')
-    .setDescription(desc);
-
-  return embed;
+  return buildContainer({ description: body, color: HELP_COLOR });
 }
 
 /**
- * Builds Category Help Embed matching Rainy Assistant reference style.
+ * Builds a Category Help page as a Components V2 container.
+ * Every command line starts with the spacer + chevron emoji bullets.
  */
-function buildCategoryEmbed(client, cat, page, totalPages, prefix) {
+function buildCategoryContent(client, cat, page, totalPages, prefix) {
   const cmds = meta.byCategory(cat).sort((a, b) => a.name.localeCompare(b.name));
   const safePage = Math.min(Math.max(0, page), totalPages - 1);
   const start = safePage * COMMANDS_PER_PAGE;
@@ -304,37 +279,29 @@ function buildCategoryEmbed(client, cat, page, totalPages, prefix) {
 
   const displayName = DISPLAY[cat] || cat.charAt(0).toUpperCase() + cat.slice(1);
   const devName = config.helpFooterName || 'Developer';
-  const timestamp = Math.floor(Date.now() / 1000);
+  const E = config.helpEmojis;
+  const ts = Math.floor(Date.now() / 1000);
+  const header = `# ${displayName} Commands  •  Page ${safePage + 1}/${totalPages}`;
 
   if (!slice.length) {
-    const desc = `No commands available in this category.\n\n-# Developed by **${devName}** • <t:${timestamp}:f>`;
-    return new EmbedBuilder()
-      .setColor(config.embedColor || 0x5865F2)
-      .setTitle(`${displayName} Commands • Page 1/1`)
-      .setDescription(desc);
+    return buildContainer({
+      description: [header, 'No commands available in this category.', `-# Developed by ${devName} • <t:${ts}:f>`].join('\n'),
+      color: HELP_COLOR,
+    });
   }
 
-  const commandLines = slice.map((c) => {
-    const hasGroup = subs.get(c.name).length > 0 ? ' **[Group]**' : '';
-    const d = c.description ? (c.description.length > 80 ? c.description.slice(0, 77) + '...' : c.description) : 'No description provided.';
-    return `\`${prefix}${c.name}\`${hasGroup} — ${d}`;
+  const lines = slice.map((c) => {
+    const tag = subs.get(c.name).length > 0 ? ' **[Group]**' : '';
+    const d = c.description ? compactDescription(c.description, 80) : 'No description provided.';
+    return `${E.spacer}${E.chevron} \`${prefix}${c.name}\`${tag} — ${d}`;
   });
 
-  const desc = [
-    commandLines.join('\n\n'),
-    '\n━━━━━━━━━━━━━━━━━━━━',
-    '',
-    `-# Developed by **${devName}** • <t:${timestamp}:f>`,
-  ].join('\n');
-
-  return new EmbedBuilder()
-    .setColor(config.embedColor || 0x5865F2)
-    .setTitle(`${displayName} Commands • Page ${safePage + 1}/${totalPages}`)
-    .setDescription(desc);
+  const body = [header, ...lines, '', `-# Developed by ${devName} • <t:${ts}:f>`].join('\n');
+  return buildContainer({ description: body, color: HELP_COLOR });
 }
 
 /**
- * Builds Detailed Command Embed when user types `?help <command>`
+ * Builds Detailed Command container when user types `?help <command>`
  */
 function buildCommandDetailEmbed(m, prefix) {
   const subList = subs.get(m.name);
@@ -343,20 +310,15 @@ function buildCommandDetailEmbed(m, prefix) {
   const displayName = DISPLAY[m.category] || m.category;
   const emoji = EMOJI[m.category] || '📌';
 
-  const embed = new EmbedBuilder()
-    .setColor(config.embedColor || 0x5865F2)
-    .setTitle(`${emoji} Command: ${prefix}${m.name}`)
-    .setDescription(`> ${m.description || 'No description provided.'}`)
-    .addFields(
-      { name: '📂 Category', value: `\`${displayName}\``, inline: true },
-      { name: '⏱ Cooldown', value: `\`${m.cooldown || 3}s\``, inline: true },
-      { name: '🔒 Permissions', value: permsStr, inline: true },
-      { name: '🏷 Aliases', value: aliasesStr, inline: true },
-      { name: '👑 Owner Only', value: m.ownerOnly ? '`Yes`' : '`No`', inline: true },
-      { name: '⚡ Slash Support', value: m.slash ? '`Enabled`' : '`Prefix Only`', inline: true },
-      { name: '📖 Usage Syntax', value: `\`\`\`${prefix}${m.name}${m.usage ? ' ' + m.usage : ''}\`\`\``, inline: false },
-    )
-    .setFooter(makeFooter());
+  const fields = [
+    { name: '📂 Category', value: `\`${displayName}\`` },
+    { name: '⏱ Cooldown', value: `\`${m.cooldown || 3}s\`` },
+    { name: '🔒 Permissions', value: permsStr },
+    { name: '🏷 Aliases', value: aliasesStr },
+    { name: '👑 Owner Only', value: m.ownerOnly ? '`Yes`' : '`No`' },
+    { name: '⚡ Slash Support', value: m.slash ? '`Enabled`' : '`Prefix Only`' },
+    `\`\`\`${prefix}${m.name}${m.usage ? ' ' + m.usage : ''}\`\`\``,
+  ];
 
   if (subList.length > 0) {
     const SUBS_PER_FIELD = 8;
@@ -364,11 +326,21 @@ function buildCommandDetailEmbed(m, prefix) {
       const chunk = subList.slice(i, i + SUBS_PER_FIELD);
       const label = subList.length > SUBS_PER_FIELD ? `🧩 Sub-commands (${i + 1}-${i + chunk.length})` : '🧩 Sub-commands';
       const value = chunk.map((s) => `• \`${prefix}${m.name} ${s.name}\` — ${s.description}`).join('\n');
-      embed.addFields({ name: label, value, inline: false });
+      fields.push({ name: label, value });
     }
   }
 
-  return embed;
+  const body = [
+    `### ${emoji} Command: ${prefix}${m.name}`,
+    `> ${m.description || 'No description provided.'}`,
+  ].join('\n');
+
+  return buildContainer({
+    description: body,
+    fields,
+    color: HELP_COLOR,
+    customFooter: makeFooter(),
+  });
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -383,7 +355,6 @@ function makeDropdown(selectedCat = null) {
       label: 'Home',
       value: 'home',
       description: 'Return to the main help overview',
-      emoji: '🏠',
       default: selectedCat === null || selectedCat === 'home',
     },
   ];
@@ -393,14 +364,13 @@ function makeDropdown(selectedCat = null) {
       label: DISPLAY[c] || c,
       value: c,
       description: (DESC[c] || `${DISPLAY[c]} commands`).slice(0, 100),
-      emoji: EMOJI[c] || '📌',
       default: selectedCat === c,
     });
   }
 
   const placeholder = selectedCat && DISPLAY[selectedCat]
-    ? `${EMOJI[selectedCat] || ''} ${DISPLAY[selectedCat]}`.trim()
-    : 'Home ▼';
+    ? DISPLAY[selectedCat]
+    : 'Home';
 
   return new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
@@ -424,12 +394,12 @@ function makePaginationButtons(cat, page, totalPages) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('help_first')
-      .setLabel('⏪')
+      .setLabel('<<')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(firstDisabled),
     new ButtonBuilder()
       .setCustomId('help_prev')
-      .setLabel('◀')
+      .setLabel('<')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(prevDisabled),
     new ButtonBuilder()
@@ -439,25 +409,23 @@ function makePaginationButtons(cat, page, totalPages) {
       .setDisabled(true),
     new ButtonBuilder()
       .setCustomId('help_next')
-      .setLabel('▶')
+      .setLabel('>')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(nextDisabled),
     new ButtonBuilder()
       .setCustomId('help_last')
-      .setLabel('⏩')
+      .setLabel('>>')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(lastDisabled)
   );
 }
 
+// Home shows only the dropdown; pagination row appears only inside a category.
 function makeRows(cat, page, totalPages) {
-  const rows = [];
-  rows.push(makeDropdown(cat));
-  rows.push(makePaginationButtons(cat, page, totalPages));
+  const rows = [makeDropdown(cat)];
+  if (cat && cat !== 'home') rows.push(makePaginationButtons(cat, page, totalPages));
   return rows;
 }
-
-const responseBuilder = require('../../utils/responseBuilder');
 
 function err(text) {
   return responseBuilder.buildError({ title: 'Help Menu', error: text });

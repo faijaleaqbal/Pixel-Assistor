@@ -1,27 +1,26 @@
 // src/utils/embeds.js
-// Central embed factory. Standardizes colors, typography, footers, and styles.
+// Central response factory. Standardizes colors, typography, footers, and styles.
 // Backward compatibility layer wrapping responseBuilder.
+// All builders return Components V2 containers — send with v2Reply.opts().
 
-const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
+const { AttachmentBuilder, ContainerBuilder } = require('discord.js');
 const responseBuilder = require('./responseBuilder');
+const { buildContainer } = require('./v2Reply');
 
 const COLORS = responseBuilder.COLORS;
 
 const color = (override) => override ?? COLORS.PRIMARY;
 
-function base({ title = '', description = '', color: c, thumbnail, image, author, footer, fields = [], timestamp = false } = {}) {
-  const e = new EmbedBuilder()
-    .setColor(color(c))
-    .setTitle(title || null)
-    .setDescription(description || null);
-
-  if (thumbnail) e.setThumbnail(thumbnail);
-  if (image) e.setImage(image);
-  if (author) e.setAuthor(author);
-  if (footer) e.setFooter(footer);
-  if (fields.length) e.addFields(fields);
-  if (timestamp) e.setTimestamp();
-  return e;
+function base({ title = '', description = '', color: c, thumbnail, image, footer, fields = [] } = {}) {
+  return buildContainer({
+    title,
+    description,
+    color: color(c),
+    thumbnail,
+    image,
+    customFooter: footer?.text,
+    fields,
+  });
 }
 
 function success(message, title = 'Success', client) {
@@ -64,7 +63,7 @@ module.exports = {
   color,
   COLORS,
   AttachmentBuilder,
-  EmbedBuilder,
+  ContainerBuilder,
   ...responseBuilder,
 };
 

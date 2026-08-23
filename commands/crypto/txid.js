@@ -10,11 +10,11 @@ const responseBuilder = require('../../utils/responseBuilder');
 //   ?tx <hash> <network>
 
 const {
-  EmbedBuilder,
   ActionRowBuilder,
   StringSelectMenuBuilder,
 } = require('discord.js');
 const config = require('../../utils/config');
+const { opts, buildContainer } = require('../../utils/v2Reply');
 const {
   parseTransaction,
   parseTxCommandInput,
@@ -98,46 +98,38 @@ module.exports = {
     const { explicitNetwork, txIdentifier, walletAddress } = parseTxCommandInput(args);
 
     if (!txIdentifier) {
-      return message.reply({
-        embeds: [
-          responseBuilder.buildResult({ title: 'Missing Transaction Identifier', description: `Usage: \`${config.prefix}tx [network] <hash> [walletAddress]\`\n\n` +
-              `Examples:\n` +
-              `• \`${config.prefix}tx polygon 0x1234...\`\n` +
-              `• \`${config.prefix}tx ltc 8d5aac33...\`\n` +
-              `• \`${config.prefix}tx solana 5UfgP...\`\n` +
-              `• \`${config.prefix}tx tron 3a7cab14...\``}),
-        ],
-      });
+      return message.reply(
+        opts(responseBuilder.buildResult({ title: 'Missing Transaction Identifier', description: `Usage: \`${config.prefix}tx [network] <hash> [walletAddress]\`\n\n` +
+            `Examples:\n` +
+            `• \`${config.prefix}tx polygon 0x1234...\`\n` +
+            `• \`${config.prefix}tx ltc 8d5aac33...\`\n` +
+            `• \`${config.prefix}tx solana 5UfgP...\`\n` +
+            `• \`${config.prefix}tx tron 3a7cab14...\``}))
+      );
     }
 
     // 1. Explicit network supplied
     if (explicitNetwork) {
       const netLabel = explicitNetwork.toUpperCase();
-      const statusMsg = await message.reply({
-        embeds: [
-          responseBuilder.buildResult({ description: `⏳ Querying **${netLabel}** for transaction \`${txIdentifier.slice(0, 16)}…\`…`}),
-        ],
-      });
+      const statusMsg = await message.reply(
+        opts(responseBuilder.buildResult({ description: `⏳ Querying **${netLabel}** for transaction \`${txIdentifier.slice(0, 16)}…\`…`}))
+      );
 
       try {
         const tx = await parseTransaction(explicitNetwork, txIdentifier, { walletAddress });
         if (!tx) {
-          return statusMsg.edit({
-            embeds: [
-              responseBuilder.buildResult({ title: 'Transaction Not Found', description: `Transaction not found on **${netLabel}** for hash:\n\`\`\`${txIdentifier}\`\`\``}),
-            ],
-          });
+          return statusMsg.edit(
+            opts(responseBuilder.buildResult({ title: 'Transaction Not Found', description: `Transaction not found on **${netLabel}** for hash:\n\`\`\`${txIdentifier}\`\`\``}))
+          );
         }
 
         const embedData = buildTransactionEmbed(tx);
-        return statusMsg.edit(embedData);
+        return statusMsg.edit(opts(embedData.container));
       } catch (err) {
         console.error(`[txid] ${explicitNetwork} lookup error:`, err);
-        return statusMsg.edit({
-          embeds: [
-            responseBuilder.buildResult({ title: 'Lookup Failed', description: `Unable to parse this transaction on **${netLabel}**:\n${err.message}`}),
-          ],
-        });
+        return statusMsg.edit(
+          opts(responseBuilder.buildResult({ title: 'Lookup Failed', description: `Unable to parse this transaction on **${netLabel}**:\n${err.message}`}))
+        );
       }
     }
 
@@ -145,23 +137,22 @@ module.exports = {
     const detected = detectTxFormat(txIdentifier);
 
     if (detected.type === 'unknown') {
-      return message.reply({
-        embeds: [
-          responseBuilder.buildResult({ title: 'Invalid Transaction Format', description: `Unrecognized transaction hash/signature format.\n\n` +
-              `Supported formats:\n` +
-              `• **EVM Chains:** \`0x...\` (66 hex characters)\n` +
-              `• **Solana:** Base58 signature (~87-89 characters)\n` +
-              `• **Litecoin / Tron:** 64 hexadecimal characters\n\n` +
-              `You can specify the network directly: \`${config.prefix}tx <network> <hash>\``}),
-        ],
-      });
+      return message.reply(
+        opts(responseBuilder.buildResult({ title: 'Invalid Transaction Format', description: `Unrecognized transaction hash/signature format.\n\n` +
+            `Supported formats:\n` +
+            `• **EVM Chains:** \`0x...\` (66 hex characters)\n` +
+            `• **Solana:** Base58 signature (~87-89 characters)\n` +
+            `• **Litecoin / Tron:** 64 hexadecimal characters\n\n` +
+            `You can specify the network directly: \`${config.prefix}tx <network> <hash>\``}))
+      );
     }
 
     // EVM: Ambiguous across chains -> show dropdown
     if (detected.type === 'evm') {
       const embed = buildAmbiguousEmbed(txIdentifier, 'EVM Chains');
       const row = buildEvmSelectRow();
-      const sent = await message.reply({ embeds: [embed], components: [row] });
+      embed.addActionRowComponents(row);
+      const sent = await message.reply(opts(embed));
       state.set(sent.id, {
         hash: txIdentifier,
         walletAddress,
@@ -174,31 +165,25 @@ module.exports = {
 
     // Solana: Direct lookup
     if (detected.type === 'solana') {
-      const statusMsg = await message.reply({
-        embeds: [
-          responseBuilder.buildResult({ description: `⏳ Querying **Solana** for signature \`${txIdentifier.slice(0, 16)}…\`…`}),
-        ],
-      });
+      const statusMsg = await message.reply(
+        opts(responseBuilder.buildResult({ description: `⏳ Querying **Solana** for signature \`${txIdentifier.slice(0, 16)}…\`…`}))
+      );
 
       try {
         const tx = await parseTransaction('solana', txIdentifier, { walletAddress });
         if (!tx) {
-          return statusMsg.edit({
-            embeds: [
-              responseBuilder.buildResult({ title: 'Transaction Not Found', description: `Transaction not found on **Solana** for signature:\n\`\`\`${txIdentifier}\`\`\``}),
-            ],
-          });
+          return statusMsg.edit(
+            opts(responseBuilder.buildResult({ title: 'Transaction Not Found', description: `Transaction not found on **Solana** for signature:\n\`\`\`${txIdentifier}\`\`\``}))
+          );
         }
 
         const embedData = buildTransactionEmbed(tx);
-        return statusMsg.edit(embedData);
+        return statusMsg.edit(opts(embedData.container));
       } catch (err) {
         console.error(`[txid] Solana lookup error:`, err);
-        return statusMsg.edit({
-          embeds: [
-            responseBuilder.buildResult({ title: 'Solana Lookup Failed', description: `Unable to parse this transaction on **Solana**:\n${err.message}`}),
-          ],
-        });
+        return statusMsg.edit(
+          opts(responseBuilder.buildResult({ title: 'Solana Lookup Failed', description: `Unable to parse this transaction on **Solana**:\n${err.message}`}))
+        );
       }
     }
 
@@ -206,7 +191,8 @@ module.exports = {
     if (detected.type === 'hex64') {
       const embed = buildAmbiguousEmbed(txIdentifier, 'Litecoin / Tron');
       const row = buildHex64SelectRow();
-      const sent = await message.reply({ embeds: [embed], components: [row] });
+      embed.addActionRowComponents(row);
+      const sent = await message.reply(opts(embed));
       state.set(sent.id, {
         hash: txIdentifier,
         walletAddress,
@@ -225,51 +211,40 @@ module.exports = {
 
       const st = state.get(interaction.message.id);
       if (!st) {
-        return interaction.update({
-          embeds: [
-            responseBuilder.buildResult({ description: 'This lookup has expired. Please run `?tx <hash>` again.'}),
-          ],
-          components: [],
-        });
+        return interaction.update(
+          opts(responseBuilder.buildResult({ description: 'This lookup has expired. Please run `?tx <hash>` again.'}))
+        );
       }
 
       if (interaction.user.id !== st.invokerId) {
-        return interaction.reply({
-          content: 'Only the user who requested this transaction lookup can choose the network.',
-          ephemeral: true,
-        });
+        return interaction.reply(
+          opts(buildContainer({ description: 'Only the user who requested this transaction lookup can choose the network.', color: '#FEE75C' }), { ephemeral: true })
+        );
       }
 
       const chainKey = interaction.values[0];
       const allOptions = [...EVM_SELECT_OPTIONS, ...HEX64_SELECT_OPTIONS];
       const opt = allOptions.find((o) => o.value === chainKey) || { label: chainKey };
 
-      await interaction.update({
-        embeds: [
-          responseBuilder.buildResult({ description: `⏳ Querying **${opt.label}** for \`${st.hash.slice(0, 16)}…\`…`}),
-        ],
-        components: [],
-      });
+      await interaction.update(
+        opts(responseBuilder.buildResult({ description: `⏳ Querying **${opt.label}** for \`${st.hash.slice(0, 16)}…\`…`}))
+      );
 
       try {
         const tx = await parseTransaction(chainKey, st.hash, { walletAddress: st.walletAddress });
         if (!tx) {
-          return interaction.message.edit({
-            embeds: [
-              responseBuilder.buildResult({ title: 'Transaction Not Found', description: `No transaction found on **${opt.label}** for hash:\n\`\`\`${st.hash}\`\`\``}),
-            ],
-          });
+          return interaction.message.edit(
+            opts(responseBuilder.buildResult({ title: 'Transaction Not Found', description: `No transaction found on **${opt.label}** for hash:\n\`\`\`${st.hash}\`\`\``}))
+          );
         }
 
         const embedData = buildTransactionEmbed(tx);
-        await interaction.message.edit(embedData);
+        await interaction.message.edit(opts(embedData.container));
       } catch (err) {
         console.error(`[txid] ${opt.label} error:`, err);
-        await interaction.message.edit({
-          embeds: [
-            responseBuilder.buildResult({ title: 'Lookup Failed', description: `Unable to parse transaction on **${opt.label}**:\n${err.message}`}),
-          ],
-        });
+        await interaction.message.edit(
+          opts(responseBuilder.buildResult({ title: 'Lookup Failed', description: `Unable to parse transaction on **${opt.label}**:\n${err.message}`}))
+        );
       } finally {
         state.delete(interaction.message.id);
       }

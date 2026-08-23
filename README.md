@@ -73,7 +73,7 @@ GUILD_ID=your_development_guild_id_here
 
 # Optional Configurations
 PREFIX=?
-EMBED_COLOR=5865F2
+EMBED_COLOR=7C3AED
 DEFAULT_COOLDOWN=3
 DB_SQLITE_PATH=./data/bot.db
 MONGO_URI=

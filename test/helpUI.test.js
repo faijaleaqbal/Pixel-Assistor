@@ -4,11 +4,13 @@
 
 const { describe, it, before } = require('node:test');
 const assert = require('node:assert/strict');
+const { MessageFlags } = require('discord.js');
 
 const helpCmd = require('../commands/utility/help');
 const meta = require('../utils/commandMeta');
 const commandHandler = require('../handlers/commandHandler');
 const subs = require('../utils/subcommands');
+const v2 = require('./helpers/v2');
 
 describe('Help UI Presentation & Logic (Rainy Reference Style)', () => {
   const mockClient = {
@@ -27,58 +29,57 @@ describe('Help UI Presentation & Logic (Rainy Reference Style)', () => {
   });
 
   // 1. Home page
-  it('1. Home page renders proper title, emojis, companion text, and structure', () => {
+  it('1. Home page renders H3 title, emojis, companion text, and structure', () => {
     const user = { id: '111222333', username: 'TestUser' };
-    const embed = helpCmd.buildHomeEmbed(mockClient, '.', user);
-    assert.equal(embed.data.title, 'Help Menu');
-    assert.ok(embed.data.description.includes('Type **.help** for more Info'));
-    assert.ok(embed.data.description.includes("I'm *Pixel-Assistor*, your friendly companion."));
-    assert.ok(embed.data.description.includes('Pick from the menu below to continue!'));
-    assert.equal(embed.data.thumbnail, undefined, 'Home page should not contain thumbnail');
+    const content = v2(helpCmd.buildHomeContent(mockClient, '.', user));
+    assert.ok(content.startsWith('### Help Menu'));
+    assert.ok(content.includes('Type **.help** for more Info'));
+    assert.ok(content.includes("I'm *Pixel-Assistor*, your friendly companion."));
+    assert.ok(content.includes('Pick from the menu below to continue!'));
   });
 
   // 2. Dynamic command count
   it('2. Dynamic command count matches total registered commands', () => {
     const totalCmds = meta.total();
-    assert.equal(totalCmds, 124);
-    const embed = helpCmd.buildHomeEmbed(mockClient, '!', { id: '1', username: 'User' });
-    assert.ok(embed.data.description.includes(`Total Commands: **${totalCmds}**`));
+    assert.equal(totalCmds, 123);
+    const content = v2(helpCmd.buildHomeContent(mockClient, '!', { id: '1', username: 'User' }));
+    assert.ok(content.includes(`Total Commands: **${totalCmds}**`));
   });
 
   // 3. Dynamic category count
   it('3. Dynamic category count matches available categories', () => {
     const cats = helpCmd.getAvailableCategories();
     assert.equal(cats.length, 8);
-    const embed = helpCmd.buildHomeEmbed(mockClient, '.', { id: '1', username: 'User' });
-    assert.ok(embed.data.description.includes(`Categories: **${cats.length}**`));
+    const content = v2(helpCmd.buildHomeContent(mockClient, '.', { id: '1', username: 'User' }));
+    assert.ok(content.includes(`Categories: **${cats.length}**`));
   });
 
   // 4. Dynamic prefix
-  it('4. Dynamic prefix is properly formatted across all embed elements', () => {
+  it('4. Dynamic prefix is properly formatted across all help elements', () => {
     const customPrefix = 'px!';
-    const embed = helpCmd.buildHomeEmbed(mockClient, customPrefix, { id: '1', username: 'User' });
-    assert.ok(embed.data.description.includes(`Type **${customPrefix}help** for more Info`));
-    assert.ok(embed.data.description.includes(`Prefix for this server: **${customPrefix}**`));
+    const content = v2(helpCmd.buildHomeContent(mockClient, customPrefix, { id: '1', username: 'User' }));
+    assert.ok(content.includes(`Type **${customPrefix}help** for more Info`));
+    assert.ok(content.includes(`Prefix for this server: **${customPrefix}**`));
   });
 
-  // 5. User mention
-  it('5. User mention displays properly with <@id> or bold username', () => {
+  // 5. User mention as markdown profile link
+  it('5. User mention renders as linked bold username with id fallback', () => {
     const userWithId = { id: '9988776655', username: 'MentionMe' };
-    const embed1 = helpCmd.buildHomeEmbed(mockClient, '.', userWithId);
-    assert.ok(embed1.data.description.includes('Hey <@9988776655>!'));
+    const content1 = v2(helpCmd.buildHomeContent(mockClient, '.', userWithId));
+    assert.ok(content1.includes('Hey **[MentionMe](https://discord.com/users/9988776655)**!'));
 
     const userWithoutId = { username: 'PlainUser' };
-    const embed2 = helpCmd.buildHomeEmbed(mockClient, '.', userWithoutId);
-    assert.ok(embed2.data.description.includes('Hey **PlainUser**!'));
+    const content2 = v2(helpCmd.buildHomeContent(mockClient, '.', userWithoutId));
+    assert.ok(content2.includes('Hey **PlainUser**!'));
   });
 
-  // 6. Developer footer
-  it('6. Developer footer includes developer name and dynamic Discord timestamp in <t:TIMESTAMP:f> format', () => {
-    const embed = helpCmd.buildHomeEmbed(mockClient, '.', { id: '1', username: 'User' });
-    assert.match(embed.data.description, /-# Developed by \*\*.*\*\* • <t:\d+:f>/);
+  // 6. Developer subtext footer + dynamic Discord timestamp
+  it('6. Footer uses -# subtext with developer name and <t:unix:f> timestamp', () => {
+    const content = v2(helpCmd.buildHomeContent(mockClient, '.', { id: '1', username: 'User' }));
+    assert.match(content, /-# Developed by .* • <t:\d+:f>/);
 
-    const catEmbed = helpCmd.buildCategoryEmbed(mockClient, 'crypto', 0, 1, '.');
-    assert.match(catEmbed.data.description, /-# Developed by \*\*.*\*\* • <t:\d+:f>/);
+    const catContent = v2(helpCmd.buildCategoryContent(mockClient, 'crypto', 0, 1, '.'));
+    assert.match(catContent, /-# Developed by .* • <t:\d+:f>/);
   });
 
   // 7. Category generation
@@ -97,11 +98,10 @@ describe('Help UI Presentation & Logic (Rainy Reference Style)', () => {
   });
 
   // 8. Category command rendering
-  it('8. Category command rendering displays commands in reference format without thumbnail', () => {
-    const embed = helpCmd.buildCategoryEmbed(mockClient, 'crypto', 0, 1, '.');
-    assert.equal(embed.data.title, 'Crypto Commands • Page 1/1');
-    assert.equal(embed.data.thumbnail, undefined, 'Category embed should have no thumbnail');
-    const desc = embed.data.description;
+  it('8. Category page renders H1 header, emoji bullets, and backticked commands', () => {
+    const content = v2(helpCmd.buildCategoryContent(mockClient, 'crypto', 0, 1, '.'));
+    assert.ok(content.startsWith('# Crypto Commands  •  Page 1/1'));
+    const desc = content;
     assert.match(desc, /`\.bal`/);
     assert.match(desc, /`\.convert`/);
     assert.match(desc, /`\.price`/);
@@ -111,8 +111,8 @@ describe('Help UI Presentation & Logic (Rainy Reference Style)', () => {
   // 9. Missing descriptions & Description compaction
   it('9. Missing descriptions fallback to "No description provided." and long descriptions are compacted', () => {
     meta.register('testnodesccmd', { category: 'nodesccat', description: '' });
-    const embed = helpCmd.buildCategoryEmbed(mockClient, 'nodesccat', 0, 1, '.');
-    assert.ok(embed.data.description.includes('`.testnodesccmd` — No description provided.'));
+    const content = v2(helpCmd.buildCategoryContent(mockClient, 'nodesccat', 0, 1, '.'));
+    assert.ok(content.includes('`.testnodesccmd` — No description provided.'));
 
     const longDesc = 'This is an extremely long command description that explains every single nuance of server administration and security moderation in excessive detail';
     const compacted = helpCmd.compactDescription(longDesc, 80);
@@ -123,16 +123,16 @@ describe('Help UI Presentation & Logic (Rainy Reference Style)', () => {
   // 10. Group markers
   it('10. Group markers show **[Group]** for commands with subcommands', () => {
     assert.ok(subs.has('autopurge'));
-    const embed = helpCmd.buildCategoryEmbed(mockClient, 'moderation', 0, 8, '.');
-    assert.ok(embed.data.description.includes('`.autopurge` **[Group]**'));
+    const content = v2(helpCmd.buildCategoryContent(mockClient, 'moderation', 0, 8, '.'));
+    assert.ok(content.includes('`.autopurge` **[Group]**'));
   });
 
   // 11. Aliases
   it('11. Aliases are displayed in single command detail lookup', () => {
     const convertMeta = meta.get('convert');
     assert.ok(convertMeta);
-    const detailEmbed = helpCmd.buildCommandDetailEmbed(convertMeta, '.', mockClient);
-    assert.ok(detailEmbed.data.fields.some((f) => f.name === '🏷 Aliases' && f.value.includes('cv')));
+    const detailEmbed = v2(helpCmd.buildCommandDetailEmbed(convertMeta, '.', mockClient));
+    assert.match(v2(detailEmbed), /Aliases[\s\S]*cv/);
   });
 
   // 12. Pagination
@@ -173,12 +173,12 @@ describe('Help UI Presentation & Logic (Rainy Reference Style)', () => {
     };
     await helpCmd.handleInteraction(selectMod, mockClient);
 
-    const buttonRow = sentComponents.find((row) => row.components.some((c) => c.data.custom_id === 'help_prev'));
-    const prevBtn = buttonRow.components.find((c) => c.data.custom_id === 'help_prev');
-    const nextBtn = buttonRow.components.find((c) => c.data.custom_id === 'help_next');
+    const rows13 = v2.v2Rows(sentComponents);
+    const prevBtn = rows13.flatMap((r) => r.components).find((c) => c.custom_id === 'help_prev');
+    const nextBtn = rows13.flatMap((r) => r.components).find((c) => c.custom_id === 'help_next');
 
-    assert.equal(prevBtn.data.disabled, true, 'Previous should be disabled on first page');
-    assert.equal(nextBtn.data.disabled, false, 'Next should be enabled on first page');
+    assert.equal(prevBtn.disabled, true, 'Previous should be disabled on first page');
+    assert.equal(nextBtn.disabled, false, 'Next should be enabled on first page');
   });
 
   // 14. Last page
@@ -215,13 +215,13 @@ describe('Help UI Presentation & Logic (Rainy Reference Style)', () => {
       update: async (p) => { sentPayload = p; },
     }, mockClient);
 
-    assert.match(sentPayload.embeds[0].data.title, /Admin Commands • Page 2\/2/);
-    const buttonRow = sentPayload.components.find((row) => row.components.some((c) => c.data.custom_id === 'help_prev'));
-    const prevBtn = buttonRow.components.find((c) => c.data.custom_id === 'help_prev');
-    const nextBtn = buttonRow.components.find((c) => c.data.custom_id === 'help_next');
+    assert.match(v2(sentPayload), /# Admin Commands.*Page 2\/2/);
+    const rows = v2.v2Rows(sentPayload);
+    const prevBtn = rows.flatMap((r) => r.components).find((c) => c.custom_id === 'help_prev');
+    const nextBtn = rows.flatMap((r) => r.components).find((c) => c.custom_id === 'help_next');
 
-    assert.equal(prevBtn.data.disabled, false, 'Previous should be enabled on last page');
-    assert.equal(nextBtn.data.disabled, true, 'Next should be disabled on last page');
+    assert.equal(prevBtn.disabled, false, 'Previous should be enabled on last page');
+    assert.equal(nextBtn.disabled, true, 'Next should be disabled on last page');
   });
 
   // 15. Previous button
@@ -256,7 +256,7 @@ describe('Help UI Presentation & Logic (Rainy Reference Style)', () => {
       customId: 'help_next',
       update: async (p) => { sentPayload = p; },
     }, mockClient);
-    assert.match(sentPayload.embeds[0].data.title, /Admin Commands • Page 2\/2/);
+    assert.match(v2(sentPayload), /# Admin Commands.*Page 2\/2/);
 
     // Go back with prev (Page 1)
     await helpCmd.handleInteraction({
@@ -268,7 +268,7 @@ describe('Help UI Presentation & Logic (Rainy Reference Style)', () => {
       customId: 'help_prev',
       update: async (p) => { sentPayload = p; },
     }, mockClient);
-    assert.match(sentPayload.embeds[0].data.title, /Admin Commands • Page 1\/2/);
+    assert.match(v2(sentPayload), /# Admin Commands.*Page 1\/2/);
   });
 
   // 16. Next button
@@ -302,7 +302,7 @@ describe('Help UI Presentation & Logic (Rainy Reference Style)', () => {
       update: async (p) => { sentPayload = p; },
     }, mockClient);
 
-    assert.match(sentPayload.embeds[0].data.title, /Admin Commands • Page 2\/2/);
+    assert.match(v2(sentPayload), /# Admin Commands.*Page 2\/2/);
   });
 
   // 17. Home button
@@ -338,8 +338,8 @@ describe('Help UI Presentation & Logic (Rainy Reference Style)', () => {
       update: async (p) => { sentPayload = p; },
     }, mockClient);
 
-    assert.equal(sentPayload.embeds[0].data.title, 'Help Menu');
-    assert.match(sentPayload.embeds[0].data.description, /Type \*\*.*help\*\* for more Info/);
+    assert.ok(v2(sentPayload).startsWith('### Help Menu'));
+    assert.match(v2(sentPayload), /Type \*\*.*help\*\* for more Info/);
   });
 
   // 18. Category selector
@@ -363,7 +363,7 @@ describe('Help UI Presentation & Logic (Rainy Reference Style)', () => {
       values: ['fun'],
       update: async (p) => { sentPayload = p; },
     }, mockClient);
-    assert.match(sentPayload.embeds[0].data.title, /Fun Commands • Page 1\/1/);
+    assert.match(v2(sentPayload), /# Fun Commands.*Page 1\/1/);
 
     // Select home from dropdown
     await helpCmd.handleInteraction({
@@ -376,7 +376,7 @@ describe('Help UI Presentation & Logic (Rainy Reference Style)', () => {
       values: ['home'],
       update: async (p) => { sentPayload = p; },
     }, mockClient);
-    assert.equal(sentPayload.embeds[0].data.title, 'Help Menu');
+    assert.ok(v2(sentPayload).startsWith('### Help Menu'));
   });
 
   // 19. Unauthorized user interaction
@@ -400,8 +400,8 @@ describe('Help UI Presentation & Logic (Rainy Reference Style)', () => {
     };
 
     await helpCmd.handleInteraction(intruderInteraction, mockClient);
-    assert.equal(replyPayload.ephemeral, true);
-    assert.equal(replyPayload.content, "This Help Menu isn't yours.");
+    assert.equal(Boolean(Number(replyPayload.flags) & MessageFlags.Ephemeral), true);
+    assert.equal(v2(replyPayload), "This Help Menu isn't yours.");
   });
 
   // 20. Expired interaction
@@ -420,13 +420,13 @@ describe('Help UI Presentation & Logic (Rainy Reference Style)', () => {
 
     await helpCmd.handleInteraction(expiredInteraction, mockClient);
     assert.ok(sentPayload);
-    assert.match(sentPayload.embeds[0].data.title, /Games Commands • Page 1\/1/);
+    assert.match(v2(sentPayload), /# Games Commands.*Page 1\/1/);
   });
 
   // 21. Empty category
   it('21. Empty category renders placeholder message and handles 1/1 pages', () => {
-    const embed = helpCmd.buildCategoryEmbed(mockClient, 'emptycat', 0, 1, '.');
-    assert.ok(embed.data.description.includes('No commands available in this category.'));
+    const content = v2(helpCmd.buildCategoryContent(mockClient, 'emptycat', 0, 1, '.'));
+    assert.ok(content.includes('No commands available in this category.'));
   });
 
   // 22. Large category
@@ -437,22 +437,22 @@ describe('Help UI Presentation & Logic (Rainy Reference Style)', () => {
     assert.equal(totalPages, 8);
 
     for (let p = 0; p < totalPages; p++) {
-      const embed = helpCmd.buildCategoryEmbed(mockClient, 'moderation', p, totalPages, '.');
-      assert.ok(embed.data.description.length > 30);
-      assert.equal(embed.data.title, `Moderation Commands • Page ${p + 1}/${totalPages}`);
+      const content = v2(helpCmd.buildCategoryContent(mockClient, 'moderation', p, totalPages, '.'));
+      assert.ok(content.length > 30);
+      assert.match(content, new RegExp(`^# Moderation Commands\\s+•\\s+Page ${p + 1}/${totalPages}`));
     }
   });
 
-  // 23. Discord embed limits
-  it('23. Discord embed limits: descriptions stay safely under 4096 chars', () => {
-    const homeEmbed = helpCmd.buildHomeEmbed(mockClient, '.', { id: '1', username: 'Test' });
-    assert.ok(homeEmbed.data.description.length < 4096);
+  // 23. Discord message limits
+  it('23. Discord limits: plain message content stays safely under 2000 chars', () => {
+    const homeContent = v2(helpCmd.buildHomeContent(mockClient, '.', { id: '1', username: 'Test' }));
+    assert.ok(homeContent.length < 2000);
 
     for (const cat of helpCmd.getAvailableCategories()) {
       const totalPages = helpCmd.calcTotalPages(cat);
       for (let p = 0; p < totalPages; p++) {
-        const catEmbed = helpCmd.buildCategoryEmbed(mockClient, cat, p, totalPages, '.');
-        assert.ok(catEmbed.data.description.length < 4096, `${cat} page ${p} exceeded 4096 chars`);
+        const catContent = v2(helpCmd.buildCategoryContent(mockClient, cat, p, totalPages, '.'));
+        assert.ok(catContent.length < 2000, `${cat} page ${p} exceeded 2000 chars`);
       }
     }
   });

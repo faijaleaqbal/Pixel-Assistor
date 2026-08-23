@@ -10,6 +10,7 @@
 //   ?whitelist clear            — clear all
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts } = require('../../utils/v2Reply');
 const { getDb } = require('../../utils/db');
 const { isOwner } = require('../../utils/perms');
 const { resolveMemberArg } = require('../../utils/resolveUser');
@@ -33,7 +34,7 @@ module.exports = {
 
   async execute(message, args, client) {
     if (!isAuth(message)) {
-      return message.reply({ embeds: [E(0xED4245, 'Only the **server owner** or **bot owner** can manage the command whitelist.')] });
+      return message.reply(opts(E(0xED4245, 'Only the **server owner** or **bot owner** can manage the command whitelist.')));
     }
 
     const sub = (args[0] || '').toLowerCase();
@@ -46,17 +47,17 @@ module.exports = {
       // ?wl me remove → remove yourself
       if (action === 'remove' || action === 'rm' || action === 'del') {
         const ok = await db.cmdWhitelist.remove(message.author.id, message.guild.id);
-        if (!ok) return message.reply({ embeds: [E(0xFEE75C, 'You are not in the command whitelist.')] });
-        return message.reply({ embeds: [E(0x57F287, '✅ You removed yourself from the command whitelist. You now need the prefix to use commands.')] });
+        if (!ok) return message.reply(opts(E(0xFEE75C, 'You are not in the command whitelist.')));
+        return message.reply(opts(E(0x57F287, '✅ You removed yourself from the command whitelist. You now need the prefix to use commands.')));
       }
 
       // ?wl me → add yourself
-      if (message.author.bot) return message.reply({ embeds: [E(0xED4245, 'Bots cannot be whitelisted.')] });
+      if (message.author.bot) return message.reply(opts(E(0xED4245, 'Bots cannot be whitelisted.')));
 
       const ok = await db.cmdWhitelist.add(message.author.id, message.guild.id, message.author.id);
-      if (!ok) return message.reply({ embeds: [E(0xFEE75C, 'You are already in the command whitelist. ✅')] });
+      if (!ok) return message.reply(opts(E(0xFEE75C, 'You are already in the command whitelist. ✅')));
 
-      return message.reply({ embeds: [E(0x57F287, '✅ You added yourself to the command whitelist. You can now use **all commands without the prefix**.')] });
+      return message.reply(opts(E(0x57F287, '✅ You added yourself to the command whitelist. You can now use **all commands without the prefix**.')));
     }
 
     // ── add ──
@@ -64,12 +65,12 @@ module.exports = {
       const target = await resolveMemberArg(message, args[1]);
       if (!target) return;
 
-      if (target.user.bot) return message.reply({ embeds: [E(0xED4245, 'You cannot add bots to the command whitelist.')] });
+      if (target.user.bot) return message.reply(opts(E(0xED4245, 'You cannot add bots to the command whitelist.')));
 
       const ok = await db.cmdWhitelist.add(target.id, message.guild.id, message.author.id);
-      if (!ok) return message.reply({ embeds: [E(0xFEE75C, `<@${target.id}> is already in the command whitelist.`)] });
+      if (!ok) return message.reply(opts(E(0xFEE75C, `<@${target.id}> is already in the command whitelist.`)));
 
-      return message.reply({ embeds: [E(0x57F287, `✅ <@${target.id}> added to the command whitelist. They can now use **all commands without the prefix**.`)] });
+      return message.reply(opts(E(0x57F287, `✅ <@${target.id}> added to the command whitelist. They can now use **all commands without the prefix**.`)));
     }
 
     // ── remove ──
@@ -78,15 +79,15 @@ module.exports = {
       if (!target) return;
 
       const ok = await db.cmdWhitelist.remove(target.id, message.guild.id);
-      if (!ok) return message.reply({ embeds: [E(0xFEE75C, `<@${target.id}> is not in the command whitelist.`)] });
+      if (!ok) return message.reply(opts(E(0xFEE75C, `<@${target.id}> is not in the command whitelist.`)));
 
-      return message.reply({ embeds: [E(0x57F287, `✅ <@${target.id}> removed from the command whitelist. They now need the prefix to use commands.`)] });
+      return message.reply(opts(E(0x57F287, `✅ <@${target.id}> removed from the command whitelist. They now need the prefix to use commands.`)));
     }
 
     // ── list ──
     if (sub === 'list' || sub === 'show') {
       const rows = await db.cmdWhitelist.list(message.guild.id);
-      if (!rows.length) return message.reply({ embeds: [E(0xFEE75C, 'The command whitelist is empty.')] });
+      if (!rows.length) return message.reply(opts(E(0xFEE75C, 'The command whitelist is empty.')));
 
       const list = rows.map((r, i) => {
         const tag = message.guild.members.cache.get(r.userId)?.user?.tag || `\`${r.userId}\``;
@@ -95,27 +96,27 @@ module.exports = {
       });
 
       const CHUNK = 10;
-      const embeds = [];
+      const pages = [];
       const totalPages = Math.ceil(list.length / CHUNK);
 
       for (let i = 0; i < list.length; i += CHUNK) {
         const pageNum = Math.floor(i / CHUNK) + 1;
-        embeds.push(responseBuilder.buildResult({ title: `📋 Command Whitelist${totalPages > 1 ? ` (${pageNum}/${totalPages})` : ''}`, description: list.slice(i, i + CHUNK).join('\n')}));
+        pages.push(responseBuilder.buildResult({ title: `📋 Command Whitelist${totalPages > 1 ? ` (${pageNum}/${totalPages})` : ''}`, description: list.slice(i, i + CHUNK).join('\n')}));
       }
 
-      if (embeds.length === 1) {
-        return message.reply({ embeds: [embeds[0]] });
+      if (pages.length === 1) {
+        return message.reply(opts(pages[0]));
       }
-      return paginate(message, embeds);
+      return paginate(message, pages);
     }
 
     // ── clear ──
     if (sub === 'clear' || sub === 'reset') {
       const count = await db.cmdWhitelist.clear(message.guild.id);
-      if (!count) return message.reply({ embeds: [E(0xFEE75C, 'The command whitelist is already empty.')] });
-      return message.reply({ embeds: [E(0x57F287, `✅ Command whitelist cleared. **${count}** user${count > 1 ? 's' : ''} removed.`)] });
+      if (!count) return message.reply(opts(E(0xFEE75C, 'The command whitelist is already empty.')));
+      return message.reply(opts(E(0x57F287, `✅ Command whitelist cleared. **${count}** user${count > 1 ? 's' : ''} removed.`)));
     }
 
-    return message.reply({ embeds: [E(0xED4245, 'Unknown sub-command. Use `me`, `add`, `remove`, `list`, or `clear`.')] });
+    return message.reply(opts(E(0xED4245, 'Unknown sub-command. Use `me`, `add`, `remove`, `list`, or `clear`.')));
   },
 };

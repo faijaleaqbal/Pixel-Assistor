@@ -3,6 +3,7 @@
 
 const responseBuilder = require('../../utils/responseBuilder');
 const config = require('../../utils/config');
+const { opts } = require('../../utils/v2Reply');
 const { getPrice, searchCoin } = require('../../utils/cryptoApi');
 
 const ALIAS = { btc: 'bitcoin', eth: 'ethereum', usdt: 'tether', usdc: 'usd-coin', sol: 'solana', matic: 'matic-network', ada: 'cardano', xrp: 'ripple', doge: 'dogecoin', ltc: 'litecoin', trx: 'tron', bnb: 'binancecoin', ton: 'the-open-network', shib: 'shiba-inu', pepe: 'pepe', wif: 'dogwifcoin', sui: 'sui', apt: 'aptos', arb: 'arbitrum', op: 'optimism', avax: 'avalanche-2', link: 'chainlink', uni: 'uniswap', aave: 'aave', dot: 'polkadot', atom: 'cosmos', near: 'near', ftm: 'fantom', mkr: 'maker', snx: 'havven', comp: 'compound-governance-token', crv: 'curve-dao-token', ldo: 'lido-dao', rpl: 'rocket-pool', fdusd: 'first-digital-usd' };
@@ -26,17 +27,17 @@ module.exports = {
   ],
   async execute(message, args, client) {
     const q = (args.join(' ') || '').toLowerCase().trim();
-    if (!q) return message.reply({ embeds: [responseBuilder.buildResult({ description: `Usage: \`${config.prefix}price <coin>\``})] });
+    if (!q) return message.reply(opts(responseBuilder.buildResult({ description: `Usage: \`${config.prefix}price <coin>\``})));
 
-    const m = await message.reply({ embeds: [responseBuilder.buildResult({ description: '⏳ Fetching price…'})] });
+    const m = await message.reply(opts(responseBuilder.buildResult({ description: '⏳ Fetching price…'})));
     const embed = await renderPriceEmbed(q, config.prefix);
-    return m.edit({ embeds: [embed] });
+    return m.edit(opts(embed));
   },
   async slashExecute(interaction) {
     const q = interaction.options.getString('coin', true).toLowerCase().trim();
     await interaction.deferReply();
     const embed = await renderPriceEmbed(q, '/');
-    return interaction.editReply({ embeds: [embed] });
+    return interaction.editReply(opts(embed));
   },
 };
 
@@ -87,10 +88,10 @@ async function renderPriceEmbed(q, prefix = '?') {
       embedFields.push({ name: 'PKR', value: `₨${(data.pkr || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, inline: true });
     }
 
-    const priceEmbed = responseBuilder.buildResult({ title: `💰 ${coinName}`, fields: [...embedFields]});
-    if (thumbnailUrl) priceEmbed.setThumbnail(thumbnailUrl);
+    const resultOptions = { title: `💰 ${coinName}`, fields: [...embedFields] };
+    if (thumbnailUrl) resultOptions.thumbnail = thumbnailUrl;
 
-    return priceEmbed;
+    return responseBuilder.buildResult(resultOptions);
   } catch (e) {
     const msg = e.message || 'Unknown error';
     let desc;

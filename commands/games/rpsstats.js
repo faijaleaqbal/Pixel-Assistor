@@ -1,6 +1,7 @@
 // src/commands/games/rpsstats.js
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts } = require('../../utils/v2Reply');
 const { getDb } = require('../../utils/db');
 const { resolveUserArg } = require('../../utils/resolveUser');
 
@@ -19,8 +20,8 @@ module.exports = {
     try {
       row = await getDb().rpsStat.get(target.id, message.guild.id);
     } catch { /* db not ready */ }
-    return message.reply({ embeds: [responseBuilder.buildResult({ title: `🎮 RPS stats — ${target.username}`, fields: [{ name: 'Wins', value: String(row.wins || 0), inline: true },
+    return message.reply(opts(responseBuilder.buildResult({ title: `🎮 RPS stats — ${target.username}`, fields: [{ name: 'Wins', value: String(row.wins || 0), inline: true },
         { name: 'Losses', value: String(row.losses || 0), inline: true },
-        { name: 'Ties', value: String(row.ties || 0), inline: true },]})], allowedMentions: { parse: [] } });
+        { name: 'Ties', value: String(row.ties || 0), inline: true },]}), { allowedMentions: { parse: [] } }));
   },
 };

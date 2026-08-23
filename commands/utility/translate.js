@@ -2,6 +2,7 @@
 // Translate text using Google Translate GTX endpoint.
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts, buildContainer } = require('../../utils/v2Reply');
 const { getJson } = require('../../utils/http');
 
 module.exports = {
@@ -13,7 +14,7 @@ module.exports = {
   cooldown: 5,
   async execute(message, args, client) {
     const full = args.join(' ');
-    if (!full) return message.reply('Please provide text to translate.');
+    if (!full) return message.reply(opts(buildContainer({ description: 'Please provide text to translate.' })));
 
     let sl = 'auto';
     let tl = 'en';
@@ -39,11 +40,11 @@ module.exports = {
           { name: 'Original', value: text.slice(0, 1024), inline: false },
           { name: 'Translated', value: translated.slice(0, 1024), inline: false },]});
 
-      return message.reply({ embeds: [embed] });
+      return message.reply(opts(embed));
     } catch {
-      return message.reply({
-        embeds: [responseBuilder.buildResult({ title: '❌ Translation Failed', description: 'Could not translate the provided text. Please try again.'})],
-      });
+      return message.reply(
+        opts(responseBuilder.buildResult({ title: '❌ Translation Failed', description: 'Could not translate the provided text. Please try again.'})),
+      );
     }
   },
 };

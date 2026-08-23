@@ -9,14 +9,14 @@
 
 const logger = require('./logger');
 const { getDb } = require('./db');
-const { EmbedBuilder } = require('discord.js');
+const { opts, buildContainer } = require('./v2Reply');
 
 let interval = null;
 
 // ── Helper: DM a user safely ──
-async function safeDm(user, embed) {
+async function safeDm(user, container) {
   try {
-    await user.send({ embeds: [embed] });
+    await user.send(opts(container));
   } catch {
     // DMs closed — skip gracefully
   }
@@ -27,7 +27,10 @@ async function deliverLegacyReminder(client, r) {
   try {
     const ch = await client.channels.fetch(r.channelId).catch(() => null);
     if (ch) {
-      await ch.send(`<@${r.userId}> \u23F0 Reminder: ${r.message || '(no message)'}`).catch(() => {});
+      const container = buildContainer({
+        description: `<@${r.userId}> \u23F0 Reminder: ${r.message || '(no message)'}`,
+      });
+      await ch.send(opts(container, { allowedMentions: { users: [r.userId] } })).catch(() => {});
     }
   } catch (e) {
     logger.warn(`legacy reminder deliver failed for ${r._id}`, e.message);
@@ -42,17 +45,17 @@ async function deliverUserReminder(client, r) {
     if (!user) return;
 
     const jumpLink = `https://discord.com/channels/${r.guildId}/${r.channelId}`;
-    const embed = new EmbedBuilder()
-      .setColor(0x5865F2)
-      .setTitle('\u23F0 Reminder!')
-      .addFields(
-        { name: 'Reason', value: r.reason || '(no reason)', inline: false },
-        { name: 'Set', value: `<t:${Math.floor(r.createdAt / 1000)}:R>`, inline: true },
-        { name: 'Channel', value: `[Jump](${jumpLink})`, inline: true },
-      )
-      .setTimestamp();
+    const container = buildContainer({
+      title: '\u23F0 Reminder!',
+      color: 0x5865F2,
+      fields: [
+        { name: 'Reason', value: r.reason || '(no reason)' },
+        { name: 'Set', value: `<t:${Math.floor(r.createdAt / 1000)}:R>` },
+        { name: 'Channel', value: `[Jump](${jumpLink})` },
+      ],
+    });
 
-    await safeDm(user, embed);
+    await safeDm(user, container);
   } catch (e) {
     logger.warn(`user reminder deliver failed for ${r._id}`, e.message);
   }
@@ -70,13 +73,13 @@ async function deliverTimer(client, r) {
       if (ch && r.messageId) {
         const msg = await ch.messages.fetch(r.messageId).catch(() => null);
         if (msg) {
-          const doneEmbed = new EmbedBuilder()
-            .setColor(0x57F287)
-            .setTitle('\u2705 Timer ended')
-            .setDescription(`**${r.reason || 'No reason provided.'}**`)
-            .setFooter({ text: `Set by ${user ? user.tag : r.userId}` })
-            .setTimestamp();
-          await msg.edit({ embeds: [doneEmbed] }).catch(() => {});
+          const doneContainer = buildContainer({
+            title: '\u2705 Timer ended',
+            description: `**${r.reason || 'No reason provided.'}**`,
+            color: 0x57F287,
+            customFooter: `Set by ${user ? user.tag : r.userId}`,
+          });
+          await msg.edit(opts(doneContainer)).catch(() => {});
         }
       }
     } catch {
@@ -86,16 +89,16 @@ async function deliverTimer(client, r) {
     // DM the user
     if (user) {
       const jumpLink = `https://discord.com/channels/${r.guildId}/${r.channelId}`;
-      const dmEmbed = new EmbedBuilder()
-        .setColor(0x5865F2)
-        .setTitle('\u23F0 Timer finished!')
-        .addFields(
-          { name: 'Reason', value: r.reason || '(no reason)', inline: false },
-          { name: 'Set', value: `<t:${Math.floor(r.createdAt / 1000)}:R>`, inline: true },
-          { name: 'Channel', value: `[Jump](${jumpLink})`, inline: true },
-        )
-        .setTimestamp();
-      await safeDm(user, dmEmbed);
+      const dmContainer = buildContainer({
+        title: '\u23F0 Timer finished!',
+        color: 0x5865F2,
+        fields: [
+          { name: 'Reason', value: r.reason || '(no reason)' },
+          { name: 'Set', value: `<t:${Math.floor(r.createdAt / 1000)}:R>` },
+          { name: 'Channel', value: `[Jump](${jumpLink})` },
+        ],
+      });
+      await safeDm(user, dmContainer);
     }
   } catch (e) {
     logger.warn(`timer deliver failed for ${r._id}`, e.message);
@@ -154,7 +157,7 @@ async function deliverScheduledMessage(client, r) {
       return;
     }
 
-    const sendOpts = { content: r.content };
+    const sendOpts = opts(buildContainer({ description: r.content }));
     if (r.attachmentUrl) {
       sendOpts.files = [{ attachment: r.attachmentUrl, name: r.attachmentName || 'scheduled-attachment' }];
     }

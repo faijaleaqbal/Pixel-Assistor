@@ -3,6 +3,7 @@ const responseBuilder = require('../../utils/responseBuilder');
 
 const { ApplicationCommandOptionType } = require('discord.js');
 const { resolveUserArg } = require('../../utils/resolveUser');
+const { opts } = require('../../utils/v2Reply');
 
 module.exports = {
   name: 'avatar',
@@ -26,18 +27,15 @@ module.exports = {
       : message.author;
     const member = await message.guild.members.fetch(target.id).catch(() => null);
     const url = member?.displayAvatarURL?.({ size: 4096, extension: 'png' }) || target.displayAvatarURL({ size: 4096, extension: 'png' });
-    return message.reply({
-      embeds: [responseBuilder.buildResult({ title: `🖼️ ${target.tag}'s avatar`, image: url})],
-      allowedMentions: { parse: [] },
-    });
+    return message.reply(
+      opts(responseBuilder.buildResult({ title: `🖼️ ${target.tag}'s avatar`, image: url}), { allowedMentions: { parse: [] } }),
+    );
   },
   async slashExecute(interaction) {
     const target = interaction.options.getUser('user') || interaction.user;
     const member = interaction.guild ? await interaction.guild.members.fetch(target.id).catch(() => null) : null;
     const url = member?.displayAvatarURL?.({ size: 4096, extension: 'png' }) || target.displayAvatarURL({ size: 4096, extension: 'png' });
-    return interaction.reply({
-      embeds: [responseBuilder.buildResult({ title: `🖼️ ${target.tag}'s avatar`, image: url})],
-    });
+    return interaction.reply(opts(responseBuilder.buildResult({ title: `🖼️ ${target.tag}'s avatar`, image: url})));
   },
 };
 

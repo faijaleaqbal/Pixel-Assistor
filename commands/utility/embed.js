@@ -1,5 +1,6 @@
 // src/commands/utility/embed.js
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts, buildContainer } = require('../../utils/v2Reply');
 
 module.exports = {
   name: 'embed',
@@ -11,7 +12,7 @@ module.exports = {
   async execute(message, args, client) {
     const raw = args.join(' ');
     if (!raw.includes('|'))
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: 'Use `|` to separate fields.\nExample: `?embed Hello | World | #ff0000`'})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: 'Use `|` to separate fields.\nExample: `?embed Hello | World | #ff0000`'})));
 
     const parts = raw.split('|').map(s => s.trim());
     const title = parts[0] || 'Untitled';
@@ -19,9 +20,9 @@ module.exports = {
     let color = 0x5865F2;
     if (parts[2] && /^#[0-9a-f]{6}$/i.test(parts[2])) color = parseInt(parts[2].replace('#', ''), 16);
 
-    const embed = responseBuilder.buildResult({ title: title, description: desc});
+    const container = buildContainer({ title, description: desc, color });
 
     try { await message.delete(); } catch {}
-    return message.channel.send({ embeds: [embed] });
+    return message.channel.send(opts(container));
   },
 };

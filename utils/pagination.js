@@ -1,11 +1,23 @@
 // src/utils/pagination.js
-// Generic paginator for embed pages.
+// Generic paginator for Components V2 container pages.
 // Usage:
-//   await pagination(message, pages[], { userId: message.author.id, timeout: 60000 });
+//   await paginate(interactionOrMessage, containers[], { userId, timeout: 60000 });
 //
+// `pages` must be an array of ContainerBuilder instances (see utils/v2Reply).
 // Buttons: Prev / Page / Next. Stops collecting after timeout, disables buttons.
 
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType,
+  ContainerBuilder,
+} = require('discord.js');
+const { opts } = require('./v2Reply');
+
+function withRow(pageContainer, row) {
+  return new ContainerBuilder(pageContainer.toJSON()).addActionRowComponents(row);
+}
 
 async function paginate(interactionOrMessage, pages, { userId, timeout = 60000, startPage = 0 } = {}) {
   if (!pages.length) return;
@@ -17,33 +29,37 @@ async function paginate(interactionOrMessage, pages, { userId, timeout = 60000, 
     new ButtonBuilder().setCustomId('pg_next').setLabel('Next ▶').setStyle(ButtonStyle.Secondary).setDisabled(page === pages.length - 1),
   );
 
-  const payload = { embeds: [pages[page]], components: [mkRow()] };
+  const render = () => opts(withRow(pages[page], mkRow()));
 
   // Send appropriately based on whether we got an interaction or a message.
   const sent = interactionOrMessage.replied || interactionOrMessage.deferred
-    ? await interactionOrMessage.editReply(payload)
-    : await interactionOrMessage.channel.send(payload);
+    ? await interactionOrMessage.editReply(render())
+    : await interactionOrMessage.channel.send(render());
 
-  const msg = sent && sent.id ? sent : (interactionOrMessage.channel ? await interactionOrMessage.channel.send(payload) : sent);
+  const msg = sent && sent.id ? sent : (interactionOrMessage.channel ? await interactionOrMessage.channel.send(render()) : sent);
 
   const collector = msg.createMessageComponentCollector({ componentType: ComponentType.Button, time: timeout });
 
   collector.on('collect', async (i) => {
     if (userId && i.user.id !== userId) {
-      return i.reply({ content: 'This pagination menu belongs to someone else.', ephemeral: true });
+      return i.reply(opts(
+        new ContainerBuilder(pages[page].toJSON()).addActionRowComponents(mkRow()),
+        { ephemeral: true },
+      ));
     }
     if (i.customId === 'pg_prev' && page > 0) page--;
     else if (i.customId === 'pg_next' && page < pages.length - 1) page++;
-    await i.update({ embeds: [pages[page]], components: [mkRow()] });
+    await i.update(render());
   });
 
   collector.on('end', async () => {
     try {
-      await msg.edit({ components: [new ActionRowBuilder().addComponents(
+      const disabledRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('pg_prev').setLabel('◀ Prev').setStyle(ButtonStyle.Secondary).setDisabled(true),
         new ButtonBuilder().setCustomId('pg_page').setLabel(`Page ${page + 1}/${pages.length}`).setStyle(ButtonStyle.Primary).setDisabled(true),
         new ButtonBuilder().setCustomId('pg_next').setLabel('Next ▶').setStyle(ButtonStyle.Secondary).setDisabled(true),
-      )] });
+      );
+      await msg.edit(opts(withRow(pages[page], disabledRow)));
     } catch { /* message might be deleted */ }
   });
 

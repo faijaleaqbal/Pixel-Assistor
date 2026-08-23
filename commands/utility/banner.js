@@ -6,6 +6,7 @@
 
 const responseBuilder = require('../../utils/responseBuilder');
 const { resolveUserArg } = require('../../utils/resolveUser');
+const { opts } = require('../../utils/v2Reply');
 
 module.exports = {
   name: 'banner',
@@ -20,8 +21,8 @@ module.exports = {
     // ?banner server
     if (sub === 'server') {
       const banner = message.guild.bannerURL({ size: 1024, extension: 'png' });
-      if (!banner) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'This server has no banner.'})] });
-      return message.reply({ embeds: [responseBuilder.buildResult({ title: `\uD83C\uDFE0 ${message.guild.name}'s banner`, image: banner})] });
+      if (!banner) return message.reply(opts(responseBuilder.buildResult({ description: 'This server has no banner.'})));
+      return message.reply(opts(responseBuilder.buildResult({ title: `\uD83C\uDFE0 ${message.guild.name}'s banner`, image: banner})));
     }
 
     // ?banner user <@user|userID>  OR  ?banner <@user|userID>  OR  ?banner (self)
@@ -36,10 +37,10 @@ module.exports = {
     try {
       u = await message.client.users.fetch(target.id, { force: true });
     } catch (e) {
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: `Failed to fetch user: ${e.message}`})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: `Failed to fetch user: ${e.message}`})));
     }
     const banner = u.bannerURL({ size: 4096, extension: 'png' });
-    if (!banner) return message.reply({ embeds: [responseBuilder.buildResult({ description: `${target.tag} has no banner.`})] });
-    return message.reply({ embeds: [responseBuilder.buildResult({ title: `\uD83D\uDDBC\uFE0F ${target.tag}'s banner`, image: banner})] });
+    if (!banner) return message.reply(opts(responseBuilder.buildResult({ description: `${target.tag} has no banner.`})));
+    return message.reply(opts(responseBuilder.buildResult({ title: `\uD83D\uDDBC\uFE0F ${target.tag}'s banner`, image: banner})));
   },
 };

@@ -2,6 +2,7 @@
 // Show the server's icon.
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts } = require('../../utils/v2Reply');
 
 module.exports = {
   name: 'servericon',
@@ -15,11 +16,11 @@ module.exports = {
     const icon = guild.iconURL({ size: 4096, extension: 'png' });
 
     if (!icon) {
-      return message.reply({ embeds: [responseBuilder.buildResult({ title: `🏠 ${guild.name}`, description: 'This server has no icon.'})] });
+      return message.reply(opts(responseBuilder.buildResult({ title: `🏠 ${guild.name}`, description: 'This server has no icon.'})));
     }
 
     const embed = responseBuilder.buildResult({ title: `🏠 ${guild.name}`, image: icon});
 
-    return message.reply({ embeds: [embed] });
+    return message.reply(opts(embed));
   },
 };

@@ -3,9 +3,10 @@ const responseBuilder = require('../../utils/responseBuilder');
 
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 const { getDb } = require('../../utils/db');
+const { opts, buildContainer } = require('../../utils/v2Reply');
 
 /**
- * Activate AFK with the given settings and return the final embed.
+ * Activate AFK with the given settings and return the final container.
  */
 async function activateAfk(message, reason, dmOnMention) {
   const now = Date.now();
@@ -13,9 +14,7 @@ async function activateAfk(message, reason, dmOnMention) {
   try { await message.member?.setNickname(`[AFK] ${message.member.nickname || message.author.username}`).catch(() => {}); } catch {}
 
   const unixSec = Math.floor(now / 1000);
-  const embed = responseBuilder.buildResult({ title: 'AFK Activated', description: `> Reason: ${reason}\n> DM on mentions: ${dmOnMention ? 'Yes' : 'No'}\n> Time set: <t:${unixSec}:R>`});
-
-  return { embed, components: [] };
+  return responseBuilder.buildResult({ title: 'AFK Activated', description: `> Reason: ${reason}\n> DM on mentions: ${dmOnMention ? 'Yes' : 'No'}\n> Time set: <t:${unixSec}:R>`});
 }
 
 module.exports = {
@@ -33,30 +32,30 @@ module.exports = {
     if (lower[0] === 'dm' && lower[1] === 'on') {
       const existing = await db.afk.get(message.author.id, message.guild.id);
       if (!existing) {
-        return message.reply({ embeds: [responseBuilder.buildResult({ description: 'You\'re not currently AFK. Use `?afk <reason>` to go AFK first.'})] });
+        return message.reply(opts(responseBuilder.buildResult({ description: 'You\'re not currently AFK. Use `?afk <reason>` to go AFK first.'})));
       }
       await db.afk.setDm(message.author.id, message.guild.id, true);
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: '✅ DM on mentions **enabled**.'})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: '✅ DM on mentions **enabled**.'})));
     }
 
     // ── ?afk dm off ──
     if (lower[0] === 'dm' && lower[1] === 'off') {
       const existing = await db.afk.get(message.author.id, message.guild.id);
       if (!existing) {
-        return message.reply({ embeds: [responseBuilder.buildResult({ description: 'You\'re not currently AFK. Use `?afk <reason>` to go AFK first.'})] });
+        return message.reply(opts(responseBuilder.buildResult({ description: 'You\'re not currently AFK. Use `?afk <reason>` to go AFK first.'})));
       }
       await db.afk.setDm(message.author.id, message.guild.id, false);
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: '✅ DM on mentions **disabled**.'})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: '✅ DM on mentions **disabled**.'})));
     }
 
     // ── ?afk clear ──
     if (lower[0] === 'clear') {
       const removed = await db.afk.remove(message.author.id, message.guild.id);
       if (!removed) {
-        return message.reply({ embeds: [responseBuilder.buildResult({ description: 'You\'re not currently AFK.'})] });
+        return message.reply(opts(responseBuilder.buildResult({ description: 'You\'re not currently AFK.'})));
       }
       try { await message.member?.setNickname(message.member.nickname?.replace(/^\[AFK\]\s*/, '')).catch(() => {}); } catch {}
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: '✅ Your AFK status has been cleared.'})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: '✅ Your AFK status has been cleared.'})));
     }
 
     // ── ?afk [reason] — interactive Yes/No button flow ──
@@ -71,7 +70,7 @@ module.exports = {
       await db.afk.set(message.author.id, message.guild.id, reason, now, dmBool);
       const unixSec = Math.floor(now / 1000);
       const embed = responseBuilder.buildResult({ title: 'AFK Updated', description: `> Reason: ${reason}\n> DM on mentions: ${dmBool ? 'Yes' : 'No'}\n> Time set: <t:${unixSec}:R>`});
-      return message.reply({ embeds: [embed] });
+      return message.reply(opts(embed));
     }
 
     // Step 1: Send the "AFK Settings" embed with Yes/No buttons
@@ -94,7 +93,7 @@ module.exports = {
         .setStyle(ButtonStyle.Secondary),
     );
 
-    const promptMsg = await message.reply({ embeds: [settingsEmbed], components: [row] });
+    const promptMsg = await message.reply(opts(settingsEmbed.addActionRowComponents(row)));
 
     // Step 2: Collector on the exact message that was sent
     const collector = promptMsg.createMessageComponentCollector({
@@ -106,7 +105,7 @@ module.exports = {
     collector.on('collect', async (interaction) => {
       // Extra guard: only the command author can press these buttons
       if (interaction.user.id !== uid) {
-        return interaction.reply({ content: "This isn't for you.", ephemeral: true });
+        return interaction.reply(opts(buildContainer({ description: "This isn't for you." }), { ephemeral: true }));
       }
 
       const dmOnMention = interaction.customId === yesId;
@@ -128,15 +127,15 @@ module.exports = {
       const unixSec = Math.floor(Date.now() / 1000);
       const activatedEmbed = responseBuilder.buildResult({ title: 'AFK Activated', description: `> Reason: ${reason}\n> DM on mentions: ${dmOnMention ? 'Yes' : 'No'}\n> Time set: <t:${unixSec}:R>`});
 
-      await interaction.update({ embeds: [activatedEmbed], components: [] });
+      await interaction.update(opts(activatedEmbed));
     });
 
     collector.on('end', async (collected, endReason) => {
       if (endReason === 'time' && collected.size === 0) {
         // Timeout — default to DM-notify OFF and activate AFK
-        const { embed, components } = await activateAfk(message, reason, false);
+        const container = await activateAfk(message, reason, false);
         try {
-          await promptMsg.edit({ embeds: [embed], components });
+          await promptMsg.edit(opts(container));
         } catch {
           // Message may have been deleted
         }

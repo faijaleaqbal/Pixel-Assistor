@@ -1,6 +1,7 @@
 // src/commands/moderation/unhide.js
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts } = require('../../utils/v2Reply');
 
 module.exports = {
   name: 'unhide',
@@ -12,6 +13,6 @@ module.exports = {
   permissions: ['ManageChannels'],
   async execute(message) {
     await message.channel.permissionOverwrites.edit(message.guild.roles.everyone, { ViewChannel: null });
-    return message.reply({ embeds: [responseBuilder.buildResult({ description: '👁️ Channel visible again.'})] });
+    return message.reply(opts(responseBuilder.buildResult({ description: '👁️ Channel visible again.'})));
   },
 };

@@ -2,6 +2,7 @@
 // Show shard information if the bot is sharded.
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts } = require('../../utils/v2Reply');
 
 module.exports = {
   name: 'shardstats',
@@ -14,7 +15,7 @@ module.exports = {
     const client = message.client;
 
     if (!client.shard) {
-      return message.reply({ embeds: [responseBuilder.buildResult({ title: '🔌 Shard Stats', description: 'This bot is **not sharded**.'})] });
+      return message.reply(opts(responseBuilder.buildResult({ title: '🔌 Shard Stats', description: 'This bot is **not sharded**.'})));
     }
 
     const guildCounts = await client.shard.fetchClientValues('guilds.cache.size');
@@ -30,6 +31,6 @@ module.exports = {
         { name: 'Total Servers', value: String(totalGuilds), inline: true },
         ...fields,]});
 
-    return message.reply({ embeds: [embed] });
+    return message.reply(opts(embed));
   },
 };

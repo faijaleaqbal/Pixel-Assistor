@@ -4,6 +4,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const purgeCmd = require('../commands/moderation/purge');
+const v2 = require('./helpers/v2');
 
 function createMockMessage(id, createdTimestamp, isBot = false, authorId = 'user1') {
   return {
@@ -183,7 +184,7 @@ describe('Purge Command Unit & Integration Tests', () => {
 
       await purgeCmd.execute(mockMsg, [input]);
       assert.ok(replied, `Should reply with error for invalid input: ${input}`);
-      const desc = replied.embeds?.[0]?.data?.description || '';
+      const desc = v2(replied);
       assert.match(desc, /❌|Invalid/);
     }
   });
@@ -207,7 +208,7 @@ describe('Purge Command Unit & Integration Tests', () => {
 
     await purgeCmd.execute(mockMsg, ['10']);
     assert.ok(replied);
-    assert.match(replied.embeds[0].data.description, /You need the \*\*Manage Messages\*\* permission/);
+    assert.match(v2(replied), /You need the \*\*Manage Messages\*\* permission/);
   });
 
   it('Rejects execution when bot lacks ManageMessages permission', async () => {
@@ -229,7 +230,7 @@ describe('Purge Command Unit & Integration Tests', () => {
 
     await purgeCmd.execute(mockMsg, ['10']);
     assert.ok(replied);
-    assert.match(replied.embeds[0].data.description, /I do not have the \*\*Manage Messages\*\* permission/);
+    assert.match(v2(replied), /I do not have the \*\*Manage Messages\*\* permission/);
   });
 
   it('Handles Discord API bulkDelete error gracefully without crashing', async () => {

@@ -8,6 +8,7 @@
 //   if (!role) return; // error already replied
 
 const ID_RE = /^\d{17,19}$/;
+const { buildContainer, opts } = require('./v2Reply');
 
 /**
  * Resolve a role from a mention OR a raw ID string.
@@ -54,7 +55,9 @@ async function resolveRoleArg(message, arg, opts = {}) {
 
 async function safeReply(message, text) {
   try {
-    await message.reply({ content: text, allowedMentions: { parse: [] } });
+    await message.reply(
+      opts(buildContainer({ description: text }), { allowedMentions: { parse: [] } }),
+    );
   } catch {
     // Channel perms may block replies
   }

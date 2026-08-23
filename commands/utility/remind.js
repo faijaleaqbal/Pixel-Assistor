@@ -4,6 +4,7 @@
 // Usage: ?remind <@user|userID> [reason]
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts, buildContainer } = require('../../utils/v2Reply');
 const { resolveUserArg } = require('../../utils/resolveUser');
 
 module.exports = {
@@ -17,10 +18,10 @@ module.exports = {
     const target = await resolveUserArg(message, args[0]);
     if (!target) return;
     if (target.bot) {
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: 'Cannot send a reminder to a bot.'})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: 'Cannot send a reminder to a bot.'})));
     }
     if (target.id === message.author.id) {
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: 'You can\'t remind yourself. Use `?rm <duration> [reason]` instead.'})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: 'You can\'t remind yourself. Use `?rm <duration> [reason]` instead.'})));
     }
 
     // Strip the mention/ID from args to get the reason
@@ -36,18 +37,17 @@ module.exports = {
 
     // DM the target
     try {
-      await target.send({ embeds: [dmEmbed] });
+      await target.send(opts(dmEmbed));
     } catch {
       // DMs closed — fallback to a channel mention (no real ping, plain text)
-      await message.channel.send({
-        content: `${target.username}, you have a reminder from ${message.author.tag}: **${reason}** — *I tried to DM you but your DMs are closed.*`,
-        allowedMentions: { parse: [] },
-      }).then((m) => { const h = setTimeout(() => m.delete().catch(() => {}), 3000); if (typeof h.unref === 'function') h.unref(); });
+      await message.channel.send(
+        opts(buildContainer({ description: `${target.username}, you have a reminder from ${message.author.tag}: **${reason}** — *I tried to DM you but your DMs are closed.*` }), { allowedMentions: { parse: [] } }),
+      ).then((m) => { const h = setTimeout(() => m.delete().catch(() => {}), 3000); if (typeof h.unref === 'function') h.unref(); });
       return;
     }
 
     // Success embed in channel (auto-deletes in 3s)
     const successEmbed = responseBuilder.buildResult({ description: `\u2705 Reminded ${target.username} successfully.`});
-    await message.channel.send({ embeds: [successEmbed] }).then((m) => { const h = setTimeout(() => m.delete().catch(() => {}), 3000); if (typeof h.unref === 'function') h.unref(); });
+    await message.channel.send(opts(successEmbed)).then((m) => { const h = setTimeout(() => m.delete().catch(() => {}), 3000); if (typeof h.unref === 'function') h.unref(); });
   },
 };

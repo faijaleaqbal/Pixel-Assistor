@@ -5,6 +5,7 @@ const responseBuilder = require('../../utils/responseBuilder');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 const { getDb } = require('../../utils/db');
 const { resolveUserArg } = require('../../utils/resolveUser');
+const { opts, buildContainer } = require('../../utils/v2Reply');
 
 const CHOICES = [
   { id: 'rock', emoji: '✊', label: 'Rock', beats: 'scissors' },
@@ -30,7 +31,7 @@ module.exports = {
     const row = new ActionRowBuilder().addComponents(
       CHOICES.map((c) => new ButtonBuilder().setCustomId(`rps_${c.id}`).setLabel(c.label).setEmoji(c.emoji).setStyle(ButtonStyle.Primary)),
     );
-    const sent = await message.reply({ embeds: [embed], components: [row], allowedMentions: { parse: [] } });
+    const sent = await message.reply(opts(embed.addActionRowComponents(row), { allowedMentions: { parse: [] } }));
 
     const collector = sent.createMessageComponentCollector({ componentType: ComponentType.Button, time: 30000 });
     const moves = new Map();
@@ -48,13 +49,13 @@ module.exports = {
           return;
         }
         if (i.user.id !== p1 && i.user.id !== p2) {
-          return i.reply({ content: 'This game is between two other players.', ephemeral: true });
+          return i.reply(opts(buildContainer({ description: 'This game is between two other players.', color: '#FEE75C' }), { ephemeral: true }));
         }
         if (moves.has(i.user.id)) {
-          return i.reply({ content: 'You already picked.', ephemeral: true });
+          return i.reply(opts(buildContainer({ description: 'You already picked.', color: '#FEE75C' }), { ephemeral: true }));
         }
         moves.set(i.user.id, choice);
-        await i.reply({ content: `You picked ${choice}.`, ephemeral: true });
+        await i.reply(opts(buildContainer({ description: `You picked ${choice}.`, color: '#57F287' }), { ephemeral: true }));
         if (moves.size === 2) {
           const c1 = moves.get(p1);
           const c2 = moves.get(p2);
@@ -65,7 +66,7 @@ module.exports = {
     });
     collector.on('end', async (_c, reason) => {
       if (reason !== 'done') {
-        await sent.edit({ embeds: [responseBuilder.buildResult({ title: 'RPS — timed out'})], components: [] }).catch(() => {});
+        await sent.edit(opts(responseBuilder.buildResult({ title: 'RPS — timed out'}))).catch(() => {});
       }
     });
   },
@@ -95,6 +96,6 @@ async function finish(message, sent, p1, p2, c1, c2, result) {
       else if (result === 'p1') { text = `<@${p1}> wins! ${c1} beats ${c2}.`; await db.rpsStat.inc(p1, message.guild.id, 'wins'); await db.rpsStat.inc(p2, message.guild.id, 'losses'); }
       else { text = `<@${p2}> wins! ${c2} beats ${c1}.`; await db.rpsStat.inc(p2, message.guild.id, 'wins'); await db.rpsStat.inc(p1, message.guild.id, 'losses'); }
     }
-    await sent.edit({ embeds: [responseBuilder.buildResult({ title: 'RPS — result', description: text})], components: [], allowedMentions: { parse: [] } });
+    await sent.edit(opts(responseBuilder.buildResult({ title: 'RPS — result', description: text}), { allowedMentions: { parse: [] } }));
   } catch (e) { console.error('[rps] finish error:', e.message); }
 }

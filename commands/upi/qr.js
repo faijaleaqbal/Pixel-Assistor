@@ -12,8 +12,16 @@ const responseBuilder = require('../../utils/responseBuilder');
 //   ?qr john@paytm 250 For lunch           → raw UPI ID, amount 250, note "For lunch"
 //   ?qr john@paytm flexible                → raw UPI ID, no fixed amount
 
-const { AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const {
+  AttachmentBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType,
+  MediaGalleryBuilder,
+} = require('discord.js');
 const config = require('../../utils/config');
+const { opts } = require('../../utils/v2Reply');
 const { getDb } = require('../../utils/db');
 const QRCode = require('qrcode');
 
@@ -138,7 +146,7 @@ async function sendQrEmbed(message, upiId, displayName, amount, note, isFlexible
   try {
     png = await QRCode.toBuffer(upiLink, { width: 512, margin: 2, color: { dark: '#000000', light: '#ffffff' } });
   } catch (e) {
-    return message.reply({ embeds: [responseBuilder.buildResult({ description: `QR generation failed: ${e.message}`})] });
+    return message.reply(opts(responseBuilder.buildResult({ description: `QR generation failed: ${e.message}`})));
   }
 
   const attachment = new AttachmentBuilder(png, { name: 'upi-qr.png' });
@@ -151,7 +159,11 @@ async function sendQrEmbed(message, upiId, displayName, amount, note, isFlexible
     descLines.push(`> Amount: ${amount.toFixed(2)}`);
   }
 
-  const embed = responseBuilder.buildResult({ title: '🧾 UPI Payment QR Code', description: descLines.join('\n'), image: 'attachment://upi-qr.png'});
+  const embed = responseBuilder.buildResult({ title: '🧾 UPI Payment QR Code', description: descLines.join('\n')});
+  // buildContainer only accepts https URLs for images — attach the local file gallery manually.
+  embed.addMediaGalleryComponents(
+    new MediaGalleryBuilder().addItems((item) => item.setURL('attachment://upi-qr.png'))
+  );
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -159,8 +171,9 @@ async function sendQrEmbed(message, upiId, displayName, amount, note, isFlexible
       .setLabel('Copy UPI ID')
       .setStyle(ButtonStyle.Secondary)
   );
+  embed.addActionRowComponents(row);
 
-  return message.reply({ embeds: [embed], files: [attachment], components: [row] });
+  return message.reply(opts(embed, { files: [attachment] }));
 }
 
 /**
@@ -199,8 +212,9 @@ async function interactiveMode(message) {
     );
 
     const promptEmbed = responseBuilder.buildResult({ title: '🧾 UPI QR — Select a saved UPI', description: 'Choose one of your saved UPI IDs below, or enter a UPI ID manually.'});
+    promptEmbed.addActionRowComponents(...buttonRows);
 
-    const promptMsg = await message.reply({ embeds: [promptEmbed], components: buttonRows });
+    const promptMsg = await message.reply(opts(promptEmbed));
 
     const collector = promptMsg.createMessageComponentCollector({
       componentType: ComponentType.Button,
@@ -216,7 +230,7 @@ async function interactiveMode(message) {
       if (interaction.customId === 'qr_int_manual') {
         // Ask for UPI ID via follow-up message
         const askEmbed = responseBuilder.buildResult({ description: 'Please type your UPI ID (e.g. `name@bank`). You have 60 seconds.'});
-        await promptMsg.edit({ embeds: [askEmbed], components: [] });
+        await promptMsg.edit(opts(askEmbed));
 
         const msgCollector = message.channel.createMessageCollector({
           filter: (m) => m.author.id === message.author.id,
@@ -227,7 +241,7 @@ async function interactiveMode(message) {
         msgCollector.on('collect', async (m) => {
           const rawUpi = m.content.trim();
           if (!rawUpi.includes('@')) {
-            return m.reply({ embeds: [responseBuilder.buildResult({ description: 'That doesn\'t look like a valid UPI ID. Cancelled.'})] }).then((r) => setTimeout(() => r.delete().catch(() => {}), 5000));
+            return m.reply(opts(responseBuilder.buildResult({ description: 'That doesn\'t look like a valid UPI ID. Cancelled.'}))).then((r) => setTimeout(() => r.delete().catch(() => {}), 5000));
           }
           // Ask for amount
           await askAmountAndGenerate(message, promptMsg, rawUpi, message.author.username);
@@ -235,7 +249,7 @@ async function interactiveMode(message) {
 
         msgCollector.on('end', (collected, reason) => {
           if (reason === 'time' && collected.size === 0) {
-            promptMsg.edit({ embeds: [responseBuilder.buildResult({ description: '⏰ Timed out — UPI QR creation cancelled.'})], components: [] }).catch(() => {});
+            promptMsg.edit(opts(responseBuilder.buildResult({ description: '⏰ Timed out — UPI QR creation cancelled.'}))).catch(() => {});
           }
         });
         return;
@@ -251,14 +265,14 @@ async function interactiveMode(message) {
 
     collector.on('end', (collected, reason) => {
       if (reason === 'time') {
-        promptMsg.edit({ embeds: [responseBuilder.buildResult({ description: '⏰ Timed out — UPI QR creation cancelled.'})], components: [] }).catch(() => {});
+        promptMsg.edit(opts(responseBuilder.buildResult({ description: '⏰ Timed out — UPI QR creation cancelled.'}))).catch(() => {});
       }
     });
   } else {
     // No saved UPIs — ask for raw UPI ID
     const askEmbed = responseBuilder.buildResult({ title: '🧾 UPI QR — Enter your UPI ID', description: 'You have no saved UPI IDs. Please type your UPI ID (e.g. `name@bank`).\nYou have 60 seconds.'});
 
-    const promptMsg = await message.reply({ embeds: [askEmbed] });
+    const promptMsg = await message.reply(opts(askEmbed));
 
     const msgCollector = message.channel.createMessageCollector({
       filter: (m) => m.author.id === message.author.id,
@@ -269,14 +283,14 @@ async function interactiveMode(message) {
     msgCollector.on('collect', async (m) => {
       const rawUpi = m.content.trim();
       if (!rawUpi.includes('@')) {
-        return m.reply({ embeds: [responseBuilder.buildResult({ description: 'That doesn\'t look like a valid UPI ID. Cancelled.'})] }).then((r) => setTimeout(() => r.delete().catch(() => {}), 5000));
+        return m.reply(opts(responseBuilder.buildResult({ description: 'That doesn\'t look like a valid UPI ID. Cancelled.'}))).then((r) => setTimeout(() => r.delete().catch(() => {}), 5000));
       }
       await askAmountAndGenerate(message, promptMsg, rawUpi, message.author.username);
     });
 
     msgCollector.on('end', (collected, reason) => {
       if (reason === 'time' && collected.size === 0) {
-        promptMsg.edit({ embeds: [responseBuilder.buildResult({ description: '⏰ Timed out — UPI QR creation cancelled.'})], components: [] }).catch(() => {});
+        promptMsg.edit(opts(responseBuilder.buildResult({ description: '⏰ Timed out — UPI QR creation cancelled.'}))).catch(() => {});
       }
     });
   }
@@ -298,8 +312,9 @@ async function askAmountAndGenerate(message, promptMsg, upiId, displayName) {
   );
 
   const askEmbed = responseBuilder.buildResult({ description: `UPI ID: \`${upiId}\`\nWould you like a fixed amount or flexible?`});
+  askEmbed.addActionRowComponents(amountRow);
 
-  await promptMsg.edit({ embeds: [askEmbed], components: [amountRow] });
+  await promptMsg.edit(opts(askEmbed));
 
   const collector = promptMsg.createMessageComponentCollector({
     componentType: ComponentType.Button,
@@ -317,7 +332,7 @@ async function askAmountAndGenerate(message, promptMsg, upiId, displayName) {
     } else {
       // Ask for amount via text
       const amtEmbed = responseBuilder.buildResult({ description: 'Please type the amount (e.g. `500`). You have 60 seconds.'});
-      await promptMsg.edit({ embeds: [amtEmbed], components: [] });
+      await promptMsg.edit(opts(amtEmbed));
 
       const msgCollector = message.channel.createMessageCollector({
         filter: (m) => m.author.id === message.author.id,
@@ -328,14 +343,14 @@ async function askAmountAndGenerate(message, promptMsg, upiId, displayName) {
       msgCollector.on('collect', async (m) => {
         const val = parseFloat(m.content.trim());
         if (isNaN(val) || val <= 0) {
-          return m.reply({ embeds: [responseBuilder.buildResult({ description: 'Invalid amount. Must be a positive number. Cancelled.'})] }).then((r) => setTimeout(() => r.delete().catch(() => {}), 5000));
+          return m.reply(opts(responseBuilder.buildResult({ description: 'Invalid amount. Must be a positive number. Cancelled.'}))).then((r) => setTimeout(() => r.delete().catch(() => {}), 5000));
         }
         await askNoteAndGenerate(message, promptMsg, upiId, displayName, val, false);
       });
 
       msgCollector.on('end', (collected, reason) => {
         if (reason === 'time' && collected.size === 0) {
-          promptMsg.edit({ embeds: [responseBuilder.buildResult({ description: '⏰ Timed out — UPI QR creation cancelled.'})], components: [] }).catch(() => {});
+          promptMsg.edit(opts(responseBuilder.buildResult({ description: '⏰ Timed out — UPI QR creation cancelled.'}))).catch(() => {});
         }
       });
     }
@@ -343,7 +358,7 @@ async function askAmountAndGenerate(message, promptMsg, upiId, displayName) {
 
   collector.on('end', (collected, reason) => {
     if (reason === 'time') {
-      promptMsg.edit({ embeds: [responseBuilder.buildResult({ description: '⏰ Timed out — UPI QR creation cancelled.'})], components: [] }).catch(() => {});
+      promptMsg.edit(opts(responseBuilder.buildResult({ description: '⏰ Timed out — UPI QR creation cancelled.'}))).catch(() => {});
     }
   });
 }
@@ -360,8 +375,9 @@ async function askNoteAndGenerate(message, promptMsg, upiId, displayName, amount
   );
 
   const noteEmbed = responseBuilder.buildResult({ description: 'Type a payment note (or click **Skip Note** to continue without one). You have 60 seconds.'});
+  noteEmbed.addActionRowComponents(skipRow);
 
-  await promptMsg.edit({ embeds: [noteEmbed], components: [skipRow] });
+  await promptMsg.edit(opts(noteEmbed));
 
   const btnCollector = promptMsg.createMessageComponentCollector({
     componentType: ComponentType.Button,
@@ -401,7 +417,7 @@ async function askNoteAndGenerate(message, promptMsg, upiId, displayName, amount
   const onEnd = () => {
     if (!handled) {
       handled = true;
-      promptMsg.edit({ embeds: [responseBuilder.buildResult({ description: '⏰ Timed out — UPI QR creation cancelled.'})], components: [] }).catch(() => {});
+      promptMsg.edit(opts(responseBuilder.buildResult({ description: '⏰ Timed out — UPI QR creation cancelled.'}))).catch(() => {});
     }
   };
   btnCollector.on('end', (_, reason) => { if (reason === 'time') onEnd(); });
@@ -425,7 +441,7 @@ module.exports = {
     if (!parsed || parsed.mode === 'interactive') {
       if (!parsed) {
         // Invalid format
-        return message.reply({ embeds: [USAGE_EMBED(config.prefix)] });
+        return message.reply(opts(USAGE_EMBED(config.prefix)));
       }
       return interactiveMode(message);
     }
@@ -434,7 +450,7 @@ module.exports = {
     if (parsed.mode === 'label_default') {
       const rows = await getDb().upi.list(message.author.id);
       if (!rows.length) {
-        return message.reply({ embeds: [responseBuilder.buildResult({ description: `You have no saved UPI IDs. Use \`${config.prefix}setupi <label> <upi-id>\` to save one first, or provide a UPI ID directly like \`${config.prefix}qr user@bank 500\`.`})] });
+        return message.reply(opts(responseBuilder.buildResult({ description: `You have no saved UPI IDs. Use \`${config.prefix}setupi <label> <upi-id>\` to save one first, or provide a UPI ID directly like \`${config.prefix}qr user@bank 500\`.`})));
       }
       // Use the first saved UPI as default
       const defaultEntry = rows[0];
@@ -443,7 +459,7 @@ module.exports = {
 
     // ── ?qr user@bank (raw UPI, no amount) → interactive for amount ──
     if (parsed.mode === 'raw_no_amount') {
-      return askAmountAndGenerate(message, await message.reply({ embeds: [responseBuilder.buildResult({ description: `UPI ID: \`${parsed.upiId}\`\nNow let\'s set the amount...`})], fetchReply: true }), parsed.upiId, message.author.username);
+      return askAmountAndGenerate(message, await message.reply(opts(responseBuilder.buildResult({ description: `UPI ID: \`${parsed.upiId}\`\nNow let\'s set the amount...`})), { fetchReply: true }), parsed.upiId, message.author.username);
     }
 
     // ── ?qr user@bank 250 For lunch (raw UPI, ready) ──
@@ -456,7 +472,7 @@ module.exports = {
       const rows = await getDb().upi.list(message.author.id);
       const found = rows.find((r) => r.label.toLowerCase() === parsed.label.toLowerCase());
       if (!found) {
-        return message.reply({ embeds: [responseBuilder.buildResult({ description: `No saved UPI under label \`${parsed.label}\`. Run \`${config.prefix}listupi\` to see your labels.`})] });
+        return message.reply(opts(responseBuilder.buildResult({ description: `No saved UPI under label \`${parsed.label}\`. Run \`${config.prefix}listupi\` to see your labels.`})));
       }
       return sendQrEmbed(message, found.upiId, message.author.username, parsed.amount, parsed.note, parsed.isFlexible);
     }
@@ -466,12 +482,12 @@ module.exports = {
       const rows = await getDb().upi.list(message.author.id);
       const found = rows.find((r) => r.label.toLowerCase() === parsed.label.toLowerCase());
       if (!found) {
-        return message.reply({ embeds: [responseBuilder.buildResult({ description: `No saved UPI under label \`${parsed.label}\`. Run \`${config.prefix}listupi\` to see your labels.`})] });
+        return message.reply(opts(responseBuilder.buildResult({ description: `No saved UPI under label \`${parsed.label}\`. Run \`${config.prefix}listupi\` to see your labels.`})));
       }
-      return askAmountAndGenerate(message, await message.reply({ embeds: [responseBuilder.buildResult({ description: `UPI ID: \`${found.upiId}\` (label: \`${parsed.label}\`)\nNow let\'s set the amount...`})], fetchReply: true }), found.upiId, message.author.username);
+      return askAmountAndGenerate(message, await message.reply(opts(responseBuilder.buildResult({ description: `UPI ID: \`${found.upiId}\` (label: \`${parsed.label}\`)\nNow let\'s set the amount...`})), { fetchReply: true }), found.upiId, message.author.username);
     }
 
     // Fallback: invalid format
-    return message.reply({ embeds: [USAGE_EMBED(config.prefix)] });
+    return message.reply(opts(USAGE_EMBED(config.prefix)));
   },
 };

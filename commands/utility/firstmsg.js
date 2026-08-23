@@ -2,6 +2,7 @@
 // Fetch and display the first message in the current channel.
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts, buildContainer } = require('../../utils/v2Reply');
 
 module.exports = {
   name: 'firstmsg',
@@ -15,10 +16,10 @@ module.exports = {
     try {
       messages = await message.channel.messages.fetch({ limit: 1, after: '0' });
     } catch (e) {
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: `Failed to fetch messages: **${e.message}**`})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: `Failed to fetch messages: **${e.message}**`})));
     }
     const first = messages.first();
-    if (!first) return message.reply('Could not find the first message.');
+    if (!first) return message.reply(opts(buildContainer({ description: 'Could not find the first message.' })));
 
     const content = first.content?.slice(0, 1024) || '*No text content*';
 
@@ -26,6 +27,6 @@ module.exports = {
         { name: 'Date', value: `<t:${Math.floor(first.createdTimestamp / 1000)}:R>`, inline: true },
         { name: 'Content', value: content, inline: false },]});
 
-    return message.reply({ embeds: [embed] });
+    return message.reply(opts(embed));
   },
 };

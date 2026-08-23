@@ -18,6 +18,7 @@
 
 const ID_RE = /^\d{17,19}$/;
 const MENTION_RE = /^<@!?(\d{17,19})>$/;
+const { buildContainer, opts } = require('./v2Reply');
 
 function extractUserId(arg) {
   if (!arg) return null;
@@ -122,7 +123,9 @@ async function resolveMemberArg(message, arg, opts = {}) {
 
 async function safeReply(message, text) {
   try {
-    await message.reply({ content: text, allowedMentions: { parse: [] } });
+    await message.reply(
+      opts(buildContainer({ description: text }), { allowedMentions: { parse: [] } }),
+    );
   } catch {
     // Channel perms may block replies
   }

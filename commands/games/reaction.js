@@ -7,6 +7,7 @@ const responseBuilder = require('../../utils/responseBuilder');
 
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 const { getDb } = require('../../utils/db');
+const { opts } = require('../../utils/v2Reply');
 
 const EMOJIS = ['🎯', '🔥', '⚡', '🌟', '💎', '🚀'];
 
@@ -27,15 +28,15 @@ module.exports = {
       new ButtonBuilder().setCustomId('react_wait').setLabel('Get ready…').setStyle(ButtonStyle.Secondary).setDisabled(true),
     );
 
-    const sent = await message.reply({ embeds: [waiting], components: [btn] });
+    const sent = await message.reply(opts(waiting.addActionRowComponents(btn)));
 
     const waitHandle = setTimeout(async () => {
       try {
-        const goEmbed = responseBuilder.buildResult({ title: '🟢 GO!', description: `React with ${targetEmoji} NOW!`});
+        const renderGo = () => responseBuilder.buildResult({ title: '🟢 GO!', description: `React with ${targetEmoji} NOW!`});
         const goBtn = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId(`react_go_${targetEmoji}`).setLabel('React!').setEmoji(targetEmoji).setStyle(ButtonStyle.Primary),
         );
-        await sent.edit({ embeds: [goEmbed], components: [goBtn] });
+        await sent.edit(opts(renderGo().addActionRowComponents(goBtn)));
 
         const collector = sent.createMessageComponentCollector({ componentType: ComponentType.Button, time: 10000 });
         let won = false;
@@ -44,15 +45,16 @@ module.exports = {
             if (won) return;
             won = true;
             await getDb().reactionStat.inc(i.user.id, message.guild.id);
-            await i.reply({ embeds: [responseBuilder.buildResult({ description: `🎉 <@${i.user.id}> won!`})], allowedMentions: { parse: [] } });
+            await i.reply(opts(responseBuilder.buildResult({ description: `🎉 <@${i.user.id}> won!`}), { allowedMentions: { parse: [] } }));
             collector.stop('won');
           } catch (e) { console.error('[reaction] collector error:', e.message); }
         });
         collector.on('end', async (_collected, reason) => {
           if (reason !== 'won') {
-            await sent.edit({ embeds: [responseBuilder.buildResult({ title: 'Time up', description: 'No one reacted in time.'})], components: [] }).catch(() => {});
+            await sent.edit(opts(responseBuilder.buildResult({ title: 'Time up', description: 'No one reacted in time.'}))).catch(() => {});
           } else {
-            await sent.edit({ components: [] }).catch(() => {});
+            // V2 messages cannot be component-less; re-render the GO state without the button row.
+            await sent.edit(opts(renderGo())).catch(() => {});
           }
         });
       } catch { /* ignore */ }

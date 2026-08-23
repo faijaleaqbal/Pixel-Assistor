@@ -2,6 +2,7 @@
 // Show Node.js runtime information.
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts } = require('../../utils/v2Reply');
 
 module.exports = {
   name: 'node',
@@ -24,6 +25,6 @@ module.exports = {
         { name: 'Heap Used', value: `${(mem.heapUsed / 1024 / 1024).toFixed(2)} MB`, inline: true },
         { name: 'Heap Total', value: `${(mem.heapTotal / 1024 / 1024).toFixed(2)} MB`, inline: true },]});
 
-    return message.reply({ embeds: [embed] });
+    return message.reply(opts(embed));
   },
 };

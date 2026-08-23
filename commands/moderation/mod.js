@@ -3,6 +3,7 @@
 
 const responseBuilder = require('../../utils/responseBuilder');
 const { getDb } = require('../../utils/db');
+const { opts, buildContainer } = require('../../utils/v2Reply');
 
 function parseRoles(raw) {
   if (Array.isArray(raw)) return raw;
@@ -25,54 +26,54 @@ module.exports = {
 
     // Show
     if (action === 'show' || action === 'list' || !action) {
-      if (!roles.length) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'No mod roles configured.'})] });
+      if (!roles.length) return message.reply(opts(responseBuilder.buildResult({ description: 'No mod roles configured.'})));
       const list = roles.map(id => {
         const r = message.guild.roles.cache.get(id);
         return r ? r.toString() + ' `' + id + '`' : '`' + id + '` (not found)';
       }).join('\n') || 'None found';
-      return message.reply({ embeds: [responseBuilder.buildResult({ title: 'Mod Roles', description: list})] });
+      return message.reply(opts(responseBuilder.buildResult({ title: 'Mod Roles', description: list})));
     }
 
     // Role (alias for show)
     if (action === 'role') {
-      if (!roles.length) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'No mod role set.'})] });
+      if (!roles.length) return message.reply(opts(responseBuilder.buildResult({ description: 'No mod role set.'})));
       const r = message.guild.roles.cache.get(roles[0]);
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: 'Current mod role: ' + (r ? r.toString() : '`' + roles[0] + '` (not found)')})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: 'Current mod role: ' + (r ? r.toString() : '`' + roles[0] + '` (not found)')})));
     }
 
     // Reset
     if (action === 'reset') {
       await db.guildConfig.set(guildId, { modRoles: [] });
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: '✅ Mod roles cleared.'})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: '✅ Mod roles cleared.'})));
     }
 
     // Add
     if (action === 'add') {
       const role = message.mentions.roles.first();
-      if (!role) return message.reply('Mention a role to add.');
-      if (roles.includes(role.id)) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'That role is already a mod role.'})] });
+      if (!role) return message.reply(opts(buildContainer({ description: 'Mention a role to add.' })));
+      if (roles.includes(role.id)) return message.reply(opts(responseBuilder.buildResult({ description: 'That role is already a mod role.'})));
       roles.push(role.id);
       await db.guildConfig.set(guildId, { modRoles: roles });
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: '✅ Added ' + role.toString() + ' as a mod role.'})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: '✅ Added ' + role.toString() + ' as a mod role.'})));
     }
 
     // Setup (set single + clear others)
     if (action === 'setup') {
       const role = message.mentions.roles.first();
-      if (!role) return message.reply('Mention a role to set as mod role.');
+      if (!role) return message.reply(opts(buildContainer({ description: 'Mention a role to set as mod role.' })));
       await db.guildConfig.set(guildId, { modRoles: [role.id] });
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: '✅ Mod role set to ' + role.toString() + '.'})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: '✅ Mod role set to ' + role.toString() + '.'})));
     }
 
     // Remove
     if (action === 'remove' || action === 'del') {
       const role = message.mentions.roles.first();
-      if (!role) return message.reply('Mention a role to remove.');
+      if (!role) return message.reply(opts(buildContainer({ description: 'Mention a role to remove.' })));
       roles = roles.filter(id => id !== role.id);
       await db.guildConfig.set(guildId, { modRoles: roles });
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: '✅ Removed ' + role.toString() + ' from mod roles.'})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: '✅ Removed ' + role.toString() + ' from mod roles.'})));
     }
 
-    return message.reply('Usage: `mod add <@role> | remove <@role> | reset | role | setup <@role> | show`');
+    return message.reply(opts(buildContainer({ description: 'Usage: `mod add <@role> | remove <@role> | reset | role | setup <@role> | show`' })));
   },
 };

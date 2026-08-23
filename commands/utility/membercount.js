@@ -2,6 +2,7 @@
 // Show server member breakdown.
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts } = require('../../utils/v2Reply');
 
 module.exports = {
   name: 'membercount',
@@ -15,7 +16,7 @@ module.exports = {
     try {
       await guild.members.fetch();
     } catch (e) {
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: `Failed to fetch members: **${e.message}**`})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: `Failed to fetch members: **${e.message}**`})));
     }
     const total = guild.memberCount;
     const humans = guild.members.cache.filter((m) => !m.user.bot).size;
@@ -27,6 +28,6 @@ module.exports = {
         { name: 'Bots', value: String(bots), inline: true },
         { name: 'Online', value: String(online), inline: true },]});
 
-    return message.reply({ embeds: [embed] });
+    return message.reply(opts(embed));
   },
 };

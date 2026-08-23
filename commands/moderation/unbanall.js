@@ -1,6 +1,7 @@
 // src/commands/moderation/unbanall.js
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts } = require('../../utils/v2Reply');
 
 module.exports = {
   name: 'unbanall',
@@ -14,9 +15,9 @@ module.exports = {
     try {
       bans = await message.guild.bans.fetch();
     } catch (e) {
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: `Failed to fetch bans: **${e.message}**`})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: `Failed to fetch bans: **${e.message}**`})));
     }
-    if (!bans.size) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'No banned users found.'})] });
+    if (!bans.size) return message.reply(opts(responseBuilder.buildResult({ description: 'No banned users found.'})));
     let count = 0;
     for (const [id] of bans) {
       try {
@@ -24,6 +25,6 @@ module.exports = {
         count++;
       } catch { /* skip */ }
     }
-    return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Unbanned ${count}/${bans.size} user(s).`})] });
+    return message.reply(opts(responseBuilder.buildResult({ description: `✅ Unbanned ${count}/${bans.size} user(s).`})));
   },
 };

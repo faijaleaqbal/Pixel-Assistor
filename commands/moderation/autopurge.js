@@ -3,6 +3,7 @@
 // Stored in-memory; restarts on bot restart.
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts, buildContainer } = require('../../utils/v2Reply');
 const logger = require('../../utils/logger');
 
 const loops = new Map(); // channelId -> intervalId
@@ -21,12 +22,12 @@ module.exports = {
     if (mode === 'off') {
       const id = loops.get(message.channelId);
       if (id) { clearInterval(id); loops.delete(message.channelId); }
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: 'Auto-purge stopped for this channel.'})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: 'Auto-purge stopped for this channel.'})));
     }
-    if (mode !== 'on') return message.reply('Usage: `autopurge on <maxAgeSeconds> [intervalSeconds]` or `autopurge off`.');
+    if (mode !== 'on') return message.reply(opts(buildContainer({ description: 'Usage: `autopurge on <maxAgeSeconds> [intervalSeconds]` or `autopurge off`.' })));
     const maxAge = parseInt(args[1], 10);
     const interval = parseInt(args[2], 10) || 60;
-    if (!maxAge || maxAge < 5) return message.reply('maxAgeSeconds must be >= 5.');
+    if (!maxAge || maxAge < 5) return message.reply(opts(buildContainer({ description: 'maxAgeSeconds must be >= 5.' })));
     if (loops.has(message.channelId)) clearInterval(loops.get(message.channelId));
     const id = setInterval(async () => {
       try {
@@ -37,6 +38,6 @@ module.exports = {
       } catch (e) { logger.debug(`autopurge ${message.channelId}: ${e.message}`); }
     }, interval * 1000);
     loops.set(message.channelId, id);
-    return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Auto-purge ON — messages older than ${maxAge}s removed every ${interval}s.`})] });
+    return message.reply(opts(responseBuilder.buildResult({ description: `✅ Auto-purge ON — messages older than ${maxAge}s removed every ${interval}s.`})));
   },
 };

@@ -1,6 +1,7 @@
 // src/commands/moderation/unban.js
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts } = require('../../utils/v2Reply');
 const { resolveUserArg } = require('../../utils/resolveUser');
 
 module.exports = {
@@ -19,9 +20,9 @@ module.exports = {
     const reason = args.slice(1).filter(a => !/^<@!?\d+>$/.test(a) && !/^\d{17,19}$/.test(a)).join(' ') || 'No reason provided';
     try {
       await message.guild.bans.remove(target.id, reason);
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Unbanned ${target.tag} — ${reason}`})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: `✅ Unbanned ${target.tag} — ${reason}`})));
     } catch (e) {
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: `Failed: ${e.message}`})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: `Failed: ${e.message}`})));
     }
   },
 };

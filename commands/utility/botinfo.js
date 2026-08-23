@@ -3,6 +3,7 @@ const responseBuilder = require('../../utils/responseBuilder');
 // Detailed bot statistics.
 
 const { version: djsVersion } = require('discord.js');
+const { opts } = require('../../utils/v2Reply');
 
 module.exports = {
   name: 'botinfo',
@@ -32,6 +33,6 @@ module.exports = {
         { name: 'discord.js', value: `v${djsVersion}`, inline: true },
         { name: 'Node.js', value: process.version, inline: true },], thumbnail: client.user.displayAvatarURL({ size: 512 })});
 
-    return message.reply({ embeds: [embed] });
+    return message.reply(opts(embed));
   },
 };

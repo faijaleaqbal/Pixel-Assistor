@@ -1,5 +1,6 @@
 // src/commands/fun/meme.js
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts } = require('../../utils/v2Reply');
 const { getJson } = require('../../utils/http');
 
 module.exports = {
@@ -15,9 +16,9 @@ module.exports = {
 
       const embed = responseBuilder.buildResult({ title: data.title ? data.title.slice(0, 256) : 'Meme', image: data.url});
 
-      return message.reply({ embeds: [embed] });
+      return message.reply(opts(embed));
     } catch {
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: 'Failed to fetch meme. Please try again.'})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: 'Failed to fetch meme. Please try again.'})));
     }
   },
 };

@@ -1,9 +1,10 @@
 // src/events/guildBanAdd.js
 // Anti-nuke: detects unauthorized bans and unbans the target + punishes executor.
 
-const { EmbedBuilder, AuditLogEvent } = require('discord.js');
+const { AuditLogEvent } = require('discord.js');
 const { getDb } = require('../utils/db');
 const logger = require('../utils/logger');
+const { buildContainer } = require('../utils/v2Reply');
 const { fetchAuditEntry, sendLog, punish, isExempt, RED, ORANGE } = require('./antinukeHelpers');
 
 module.exports = {
@@ -22,21 +23,26 @@ module.exports = {
       if (await isExempt(user, guild, cfg, client)) return;
 
       // Log
-      await sendLog(guild, cfg, client, new EmbedBuilder().setColor(RED)
-        .setAuthor({ name: user.tag, iconURL: user.displayAvatarURL() })
-        .setTitle('🛑 Unauthorized Ban')
-        .setDescription(`**${user.tag}** banned **${ban.user.tag}**`)
-        .addFields(
-          { name: 'Target', value: `${ban.user.tag} (${ban.user.id})`, inline: true },
-          { name: 'Punishment', value: `\`${cfg.punishment}\``, inline: true },
-        ).setTimestamp());
+      await sendLog(guild, cfg, client, buildContainer({
+        emoji: '🛑',
+        title: 'Unauthorized Ban',
+        description: `**${user.tag}** banned **${ban.user.tag}**`,
+        fields: [
+          { name: 'Target', value: `${ban.user.tag} (${ban.user.id})` },
+          { name: 'Punishment', value: `\`${cfg.punishment}\`` },
+        ],
+        color: RED,
+      }));
 
       // Undo: unban the target
       await guild.members.unban(ban.user.id, 'Anti-nuke: unauthorized ban').catch(() => {});
 
-      await sendLog(guild, cfg, client, new EmbedBuilder().setColor(ORANGE)
-        .setTitle('🔄 Target Unbanned')
-        .setDescription(`**${ban.user.tag}** has been unbanned.`));
+      await sendLog(guild, cfg, client, buildContainer({
+        emoji: '🔄',
+        title: 'Target Unbanned',
+        description: `**${ban.user.tag}** has been unbanned.`,
+        color: ORANGE,
+      }));
 
       // Punish executor
       await punish(guild, cfg, user);

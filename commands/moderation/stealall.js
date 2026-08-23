@@ -1,5 +1,6 @@
 // src/commands/moderation/stealall.js
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts } = require('../../utils/v2Reply');
 
 module.exports = {
   name: 'stealall',
@@ -13,10 +14,10 @@ module.exports = {
       ? await message.channel.messages.fetch(message.reference.messageId).catch(() => null)
       : null;
     const target = ref || (await message.channel.messages.fetch({ limit: 2 }).then(m => m.last()));
-    if (!target) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'No message found.'})] });
+    if (!target) return message.reply(opts(responseBuilder.buildResult({ description: 'No message found.'})));
 
     const custom = [...new Set((target.content.match(/<a?:[\w]+:\d+>/g) || []))];
-    if (!custom.length) return message.reply({ embeds: [responseBuilder.buildResult({ description: 'No custom emojis found.'})] });
+    if (!custom.length) return message.reply(opts(responseBuilder.buildResult({ description: 'No custom emojis found.'})));
 
     // Discord's emoji limit depends on the guild's premium tier — use the
     // authoritative value when available. Fall back to the formula only if needed.
@@ -24,7 +25,7 @@ module.exports = {
       ? message.guild.maximumEmojis
       : 50 + (message.guild.premiumTier || 0) * 50;
     if (message.guild.emojis.cache.size >= maxEmojis)
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: 'Server emoji limit reached.'})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: 'Server emoji limit reached.'})));
 
     const results = [];
     for (const emoji of custom) {
@@ -38,6 +39,6 @@ module.exports = {
         results.push(`✅ ${e.name}`);
       } catch (err) { results.push(`❌ ${emoji} — ${err.message}`); }
     }
-    return message.reply({ embeds: [responseBuilder.buildResult({ title: 'Steal Results', description: results.join('\n')})] });
+    return message.reply(opts(responseBuilder.buildResult({ title: 'Steal Results', description: results.join('\n')})));
   },
 };

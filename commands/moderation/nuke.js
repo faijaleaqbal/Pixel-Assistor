@@ -3,6 +3,7 @@
 
 const responseBuilder = require('../../utils/responseBuilder');
 const { checkBotPermissions } = require('../../utils/perms');
+const { opts } = require('../../utils/v2Reply');
 
 module.exports = {
   name: 'nuke',
@@ -18,31 +19,31 @@ module.exports = {
     // Check bot permissions
     const botCheck = checkBotPermissions(message, ['ManageChannels']);
     if (!botCheck.ok) {
-      return message.reply({
-        embeds: [responseBuilder.buildResult({ description: '❌ I need the **ManageChannels** permission in this channel to nuke it.'})],
-      });
+      return message.reply(
+        opts(responseBuilder.buildResult({ description: '❌ I need the **ManageChannels** permission in this channel to nuke it.'})),
+      );
     }
 
     // Guard essential community channels
     if (message.guild.rulesChannelId === old.id || message.guild.publicUpdatesChannelId === old.id || message.guild.systemChannelId === old.id) {
-      return message.reply({
-        embeds: [responseBuilder.buildResult({ description: '❌ Cannot nuke server system, rules, or community updates channels.'})],
-      });
+      return message.reply(
+        opts(responseBuilder.buildResult({ description: '❌ Cannot nuke server system, rules, or community updates channels.'})),
+      );
     }
 
     if (!old.deletable) {
-      return message.reply({
-        embeds: [responseBuilder.buildResult({ description: '❌ This channel is not deletable by the bot.'})],
-      });
+      return message.reply(
+        opts(responseBuilder.buildResult({ description: '❌ This channel is not deletable by the bot.'})),
+      );
     }
 
     try {
       const pos = old.rawPosition;
       const created = await old.clone({ position: pos });
       await old.delete(`Nuked by ${message.author.tag}`);
-      return created.send({ embeds: [responseBuilder.buildResult({ description: `💥 Channel nuked by ${message.author}.`})] }).catch(() => {});
+      return created.send(opts(responseBuilder.buildResult({ description: `💥 Channel nuked by ${message.author}.`}))).catch(() => {});
     } catch (e) {
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: `❌ Nuke failed: **${e.message}**`})] }).catch(() => {});
+      return message.reply(opts(responseBuilder.buildResult({ description: `❌ Nuke failed: **${e.message}**`}))).catch(() => {});
     }
   },
 };

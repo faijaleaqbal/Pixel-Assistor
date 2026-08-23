@@ -1,6 +1,7 @@
 // src/commands/utility/serverinfo.js
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts } = require('../../utils/v2Reply');
 
 module.exports = {
   name: 'serverinfo',
@@ -30,7 +31,7 @@ module.exports = {
         { name: 'Roles', value: String(g.roles?.cache?.size || 0), inline: true },
         { name: 'Boosts', value: `Level ${g.premiumTier || 0} (${g.premiumSubscriptionCount || 0} boosts)`, inline: true },
         { name: 'Verification', value: verText, inline: true },], thumbnail: g.iconURL({ size: 512 })});
-    return message.reply({ embeds: [e], allowedMentions: { parse: [] } });
+    return message.reply(opts(e, { allowedMentions: { parse: [] } }));
   },
 };
 

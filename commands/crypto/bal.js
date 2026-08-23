@@ -24,13 +24,13 @@ const responseBuilder = require('../../utils/responseBuilder');
 //   Button: "View Address 🔗"
 
 const {
-  EmbedBuilder,
   ActionRowBuilder,
   StringSelectMenuBuilder,
   ButtonBuilder,
   ButtonStyle,
 } = require('discord.js');
 const config = require('../../utils/config');
+const { opts, buildContainer } = require('../../utils/v2Reply');
 const {
   detectAddressChain,
   evmFetchBalance,
@@ -124,9 +124,9 @@ function buildBalanceEmbed(b) {
         .setURL(b.explorerAddrUrl)
         .setEmoji('🔗')
     );
-    return { embeds: [e], components: [row] };
+    e.addActionRowComponents(row);
   }
-  return { embeds: [e] };
+  return opts(e);
 }
 
 module.exports = {
@@ -140,27 +140,28 @@ module.exports = {
   async execute(message, args, client) {
     const address = String(args[0] || '').trim();
     if (!address) {
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: `Usage: \`${config.prefix}bal <address>\``})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: `Usage: \`${config.prefix}bal <address>\``})));
     }
 
     const detected = detectAddressChain(address);
 
     if (detected.type === 'unknown') {
-      return message.reply({ embeds: [responseBuilder.buildResult({ title: 'Invalid Address', description: 'Invalid or unrecognized wallet address format.\nSupported: EVM (`0x…` 42 chars), Tron (`T…`), Litecoin (`L…`/`M…`/`3…`/`ltc1…`), Solana (base58 32-44 chars).'})] });
+      return message.reply(opts(responseBuilder.buildResult({ title: 'Invalid Address', description: 'Invalid or unrecognized wallet address format.\nSupported: EVM (`0x…` 42 chars), Tron (`T…`), Litecoin (`L…`/`M…`/`3…`/`ltc1…`), Solana (base58 32-44 chars).'})));
     }
 
     // ── EVM-ambiguous: show the network select menu ──
     if (detected.type === 'evm') {
       const embed = buildAmbiguousEmbed(address);
       const row = buildNetworkSelect();
-      const sent = await message.reply({ embeds: [embed], components: [row] });
+      embed.addActionRowComponents(row);
+      const sent = await message.reply(opts(embed));
       state.set(sent.id, { address, kind: 'bal', at: Date.now(), invokerId: message.author.id });
       setTimeout(() => state.delete(sent.id), 5 * 60_000).unref?.();
       return;
     }
 
     // ── Direct lookups for non-ambiguous chains ──
-    const m = await message.reply({ embeds: [responseBuilder.buildResult({ description: `⏳ Fetching ${detected.type === 'tron' ? 'Tron' : detected.type === 'litecoin' ? 'Litecoin' : 'Solana'} balance…`})] });
+    const m = await message.reply(opts(responseBuilder.buildResult({ description: `⏳ Fetching ${detected.type === 'tron' ? 'Tron' : detected.type === 'litecoin' ? 'Litecoin' : 'Solana'} balance…`})));
 
     try {
       let bal;
@@ -180,7 +181,7 @@ module.exports = {
       }
       return m.edit(buildBalanceEmbed(bal));
     } catch (e) {
-      return m.edit({ embeds: [responseBuilder.buildResult({ description: `Balance lookup failed: **${e.message}**`})] });
+      return m.edit(opts(responseBuilder.buildResult({ description: `Balance lookup failed: **${e.message}**`})));
     }
   },
 
@@ -190,22 +191,21 @@ module.exports = {
       if (!interaction.isStringSelectMenu() || interaction.customId !== 'bal_network_select') return;
       const st = state.get(interaction.message.id);
       if (!st) {
-        return interaction.update({ embeds: [responseBuilder.buildResult({ description: 'This lookup has expired. Run `?bal <address>` again.'})], components: [] });
+        return interaction.update(opts(responseBuilder.buildResult({ description: 'This lookup has expired. Run `?bal <address>` again.'})));
       }
       // Only the original invoker can pick the network — prevents other users in
       // the channel from triggering API calls on the invoker's behalf.
       if (interaction.user.id !== st.invokerId) {
-        return interaction.reply({ content: 'Only the user who ran `?bal` can pick the network.', ephemeral: true });
+        return interaction.reply(opts(buildContainer({ description: 'Only the user who ran `?bal` can pick the network.', color: '#FEE75C' }), { ephemeral: true }));
       }
       const chainKey = interaction.values[0];
       const opt = EVM_OPTIONS.find((o) => o.value === chainKey);
       if (!opt) return interaction.deferUpdate?.().catch(() => {});
 
       // Edit to "Fetching <Chain> balance..."
-      await interaction.update({
-        embeds: [responseBuilder.buildResult({ description: `Fetching ${opt.label} balance…`})],
-        components: [],
-      });
+      await interaction.update(
+        opts(responseBuilder.buildResult({ description: `Fetching ${opt.label} balance…`}))
+      );
 
       try {
         const bal = await evmFetchBalance(chainKey, st.address);
@@ -218,14 +218,14 @@ module.exports = {
         }
         await interaction.message.edit(buildBalanceEmbed(bal));
       } catch (e) {
-        await interaction.message.edit({ embeds: [responseBuilder.buildResult({ description: `${opt.label} balance lookup failed: **${e.message}**`})] }).catch(() => {});
+        await interaction.message.edit(opts(responseBuilder.buildResult({ description: `${opt.label} balance lookup failed: **${e.message}**`}))).catch(() => {});
       } finally {
         state.delete(interaction.message.id);
       }
     } catch (e) {
       try {
         if (!interaction.replied && !interaction.deferred) {
-          await interaction.reply({ content: 'Balance lookup error: ' + (e?.message || 'unknown'), ephemeral: true }).catch(() => {});
+          await interaction.reply(opts(buildContainer({ description: 'Balance lookup error: ' + (e?.message || 'unknown'), color: '#ED4245' }), { ephemeral: true })).catch(() => {});
         }
       } catch { /* ignore */ }
     }

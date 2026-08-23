@@ -4,6 +4,7 @@ const responseBuilder = require('../../utils/responseBuilder');
 
 const { UserFlagsBitField } = require('discord.js');
 const { resolveUserArg } = require('../../utils/resolveUser');
+const { opts } = require('../../utils/v2Reply');
 
 const FLAG_NAMES = {
   [UserFlagsBitField.Flags.ActiveDeveloper]: '🟢 Active Developer',
@@ -39,7 +40,7 @@ module.exports = {
 
     const flags = user.flags;
     if (!flags || flags.bitfield === 0n) {
-      return message.reply({ embeds: [responseBuilder.buildResult({ title: `🎖️ ${user.tag}'s Badges`, description: 'This user has no badges.'})], allowedMentions: { parse: [] } });
+      return message.reply(opts(responseBuilder.buildResult({ title: `🎖️ ${user.tag}'s Badges`, description: 'This user has no badges.'}), { allowedMentions: { parse: [] } }));
     }
 
     const badgeList = [];
@@ -49,6 +50,6 @@ module.exports = {
 
     const embed = responseBuilder.buildResult({ title: `🎖️ ${user.tag}'s Badges`, description: badgeList.join('\n') || 'No known badges.', thumbnail: user.displayAvatarURL({ size: 256 })});
 
-    return message.reply({ embeds: [embed], allowedMentions: { parse: [] } });
+    return message.reply(opts(embed, { allowedMentions: { parse: [] } }));
   },
 };

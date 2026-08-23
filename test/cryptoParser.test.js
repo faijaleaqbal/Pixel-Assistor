@@ -17,6 +17,7 @@ const { resolveTokenMetadata, decodeAbiUint } = require('../utils/crypto/tokenRe
 const { enrichTransactionWithPrices } = require('../utils/crypto/priceService');
 const { buildTransactionEmbed } = require('../utils/crypto/embedFormatter');
 const cryptoApi = require('../utils/cryptoApi');
+const v2 = require('./helpers/v2');
 
 describe('Deterministic Network Detection', () => {
   it('Priority A: Explicit network in command args', () => {
@@ -176,7 +177,7 @@ describe('Token Decimal Resolution & Safety (No 18-decimal Fallback)', () => {
     });
 
     const embedData = buildTransactionEmbed(tx);
-    const desc = embedData.embeds[0].data.description;
+    const desc = v2(embedData.container);
     assert.match(desc, /956183000000000 CUSTOM \(Decimals Unknown\)/);
     assert.match(desc, /Token decimals could not be determined/);
   });
@@ -198,8 +199,8 @@ describe('Confirmation and Finality Hardening', () => {
     assert.equal(tx.status, 'pending');
     assert.equal(tx.confirmations, 0);
     const embedData = buildTransactionEmbed(tx);
-    assert.match(embedData.embeds[0].data.description, /Pending ⏳/);
-    assert.match(embedData.embeds[0].data.description, /0 \(Unconfirmed\)/);
+    assert.match(v2(embedData.container), /Pending ⏳/);
+    assert.match(v2(embedData.container), /0 \(Unconfirmed\)/);
   });
 
   it('EVM: Failed when receipt status is 0', () => {
@@ -216,7 +217,7 @@ describe('Confirmation and Finality Hardening', () => {
 
     assert.equal(tx.status, 'failed');
     const embedData = buildTransactionEmbed(tx);
-    assert.match(embedData.embeds[0].data.description, /Failed ❌/);
+    assert.match(v2(embedData.container), /Failed ❌/);
   });
 
   it('EVM: Confirmed when receipt status is 1 with exact block confirmations', () => {
@@ -235,8 +236,8 @@ describe('Confirmation and Finality Hardening', () => {
     assert.equal(tx.status, 'confirmed');
     assert.equal(tx.confirmations, 42);
     const embedData = buildTransactionEmbed(tx);
-    assert.match(embedData.embeds[0].data.description, /Confirmed ✅/);
-    assert.match(embedData.embeds[0].data.description, /42/);
+    assert.match(v2(embedData.container), /Confirmed ✅/);
+    assert.match(v2(embedData.container), /42/);
   });
 
   it('Litecoin: Pending when 0 confirmations', () => {
@@ -253,7 +254,7 @@ describe('Confirmation and Finality Hardening', () => {
 
     assert.equal(tx.status, 'pending');
     const embedData = buildTransactionEmbed(tx);
-    assert.match(embedData.embeds[0].data.description, /Pending ⏳/);
+    assert.match(v2(embedData.container), /Pending ⏳/);
   });
 
   it('Solana: Failed when meta.err is present', () => {
@@ -270,7 +271,7 @@ describe('Confirmation and Finality Hardening', () => {
 
     assert.equal(tx.status, 'failed');
     const embedData = buildTransactionEmbed(tx);
-    assert.match(embedData.embeds[0].data.description, /Failed ❌/);
+    assert.match(v2(embedData.container), /Failed ❌/);
   });
 
   it('Tron: Failed when contractRet is not SUCCESS', () => {
@@ -287,7 +288,7 @@ describe('Confirmation and Finality Hardening', () => {
 
     assert.equal(tx.status, 'failed');
     const embedData = buildTransactionEmbed(tx);
-    assert.match(embedData.embeds[0].data.description, /Failed ❌/);
+    assert.match(v2(embedData.container), /Failed ❌/);
   });
 });
 
@@ -324,7 +325,7 @@ describe('Timestamp Hardening (No Fake Date.now() Fallback)', () => {
 
     assert.equal(tx.timestamp, null);
     const embedData = buildTransactionEmbed(tx);
-    assert.match(embedData.embeds[0].data.description, /Created At:\*\* \*Unknown\*/);
+    assert.match(v2(embedData.container), /Created At:\*\* \*Unknown\*/);
   });
 });
 
@@ -359,7 +360,7 @@ describe('Polygon & EVM Multi-Chain Support', () => {
     assert.equal(tx.primaryAsset.symbol, 'POL');
     assert.equal(tx.primaryAsset.amount, 5.5);
     const embedData = buildTransactionEmbed(tx);
-    assert.match(embedData.embeds[0].data.description, /5\.5 POL/);
+    assert.match(v2(embedData.container), /5\.5 POL/);
   });
 
   it('Parses Polygon USDT transfer and never outputs "0 POL"', () => {
@@ -400,7 +401,7 @@ describe('Polygon & EVM Multi-Chain Support', () => {
     assert.equal(tx.primaryAsset.amount, 0.956183);
 
     const embedData = buildTransactionEmbed(tx);
-    const desc = embedData.embeds[0].data.description;
+    const desc = v2(embedData.container);
     assert.match(desc, /0\.956183 USDT/);
     assert.doesNotMatch(desc, /Total Amount: 0 POL/);
   });
@@ -428,7 +429,7 @@ describe('Polygon & EVM Multi-Chain Support', () => {
     assert.equal(tx.fee.amount, 0.001);
 
     const embedData = buildTransactionEmbed(tx);
-    const desc = embedData.embeds[0].data.description;
+    const desc = v2(embedData.container);
     assert.match(desc, /0\.956183 USDT/);
     assert.match(desc, /5 USDC/);
   });
@@ -462,7 +463,7 @@ describe('Litecoin UTXO Accounting & Edge Cases', () => {
 
     // Embed formatting check
     const embedData = buildTransactionEmbed(tx);
-    const desc = embedData.embeds[0].data.description;
+    const desc = v2(embedData.container);
     assert.match(desc, /0\.02276348 LTC/);
     assert.match(desc, /`LZLmSrgm…EJpFui`/);
     assert.match(desc, /`ltc1qjuk…s9ct35`/);
@@ -580,7 +581,7 @@ describe('Litecoin UTXO Accounting & Edge Cases', () => {
     });
 
     const embedData = buildTransactionEmbed(tx);
-    const desc = embedData.embeds[0].data.description;
+    const desc = v2(embedData.container);
 
     assert.match(desc, /`Unknown`/);
     assert.match(desc, /`LgN8Q9g2…6x5y4z`/);
@@ -642,7 +643,7 @@ describe('Solana Transaction Parsing & SPL Token Support', () => {
     assert.notEqual(tx.primaryAsset.symbol, 'SOL');
 
     const embedData = buildTransactionEmbed(tx);
-    const desc = embedData.embeds[0].data.description;
+    const desc = v2(embedData.container);
     assert.match(desc, /12\.5 USDC/);
     assert.doesNotMatch(desc, /Total Amount: 0 SOL/);
   });
@@ -666,8 +667,8 @@ describe('Solana Transaction Parsing & SPL Token Support', () => {
 
     assert.equal(tx.tokenTransfers.length, 2);
     const embedData = buildTransactionEmbed(tx);
-    assert.match(embedData.embeds[0].data.description, /10 USDC/);
-    assert.match(embedData.embeds[0].data.description, /20 USDT/);
+    assert.match(v2(embedData.container), /10 USDC/);
+    assert.match(v2(embedData.container), /20 USDT/);
   });
 });
 
@@ -786,7 +787,7 @@ describe('Price Enrichment & Sanity Checks', () => {
     assert.ok(usdtTx.primaryAsset.usdValue > 0.9 && usdtTx.primaryAsset.usdValue < 1.1);
 
     const usdtEmbed = buildTransactionEmbed(usdtTx);
-    assert.match(usdtEmbed.embeds[0].data.description, /Approx\. Value/);
+    assert.match(v2(usdtEmbed.container), /Approx\. Value/);
   });
 
   it('Handles price unavailable gracefully without returning $0 or NaN', () => {
@@ -803,7 +804,7 @@ describe('Price Enrichment & Sanity Checks', () => {
     });
 
     const embedData = buildTransactionEmbed(tx);
-    const desc = embedData.embeds[0].data.description;
+    const desc = v2(embedData.container);
     assert.match(desc, /Price unavailable/);
     assert.doesNotMatch(desc, /\$0\.00 USD/);
     assert.doesNotMatch(desc, /NaN/);

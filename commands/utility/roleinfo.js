@@ -3,6 +3,7 @@
 // Supports both @role mention and raw role ID.
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts } = require('../../utils/v2Reply');
 const { resolveRoleArg } = require('../../utils/resolveRole');
 
 module.exports = {
@@ -32,6 +33,6 @@ module.exports = {
         { name: 'Created', value: `<t:${Math.floor(role.createdTimestamp / 1000)}:R> (<t:${Math.floor(role.createdTimestamp / 1000)}:F>)`, inline: false },
         { name: 'Key Permissions', value: permsList, inline: false },]});
 
-    return message.reply({ embeds: [embed] });
+    return message.reply(opts(embed));
   },
 };

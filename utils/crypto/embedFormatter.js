@@ -160,7 +160,7 @@ function buildTransactionEmbed(tx, client) {
     fields.push({ name: 'Tx Hash', value: `\`${tx.txHash}\`` });
   }
 
-  const embed = responseBuilder.buildResult({
+  const container = responseBuilder.buildResult({
     title: `${tx.network} Transaction`,
     emoji,
     color,
@@ -169,9 +169,8 @@ function buildTransactionEmbed(tx, client) {
     client,
   });
 
-  const components = [];
   if (tx.explorerTxUrl) {
-    components.push(
+    container.addActionRowComponents(
       new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setLabel('View on Explorer')
@@ -182,7 +181,7 @@ function buildTransactionEmbed(tx, client) {
     );
   }
 
-  return { embeds: [embed], components };
+  return { container };
 }
 
 module.exports = {

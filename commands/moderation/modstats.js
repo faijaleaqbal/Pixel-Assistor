@@ -3,6 +3,7 @@
 const responseBuilder = require('../../utils/responseBuilder');
 const { getDb } = require('../../utils/db');
 const { resolveMemberArg } = require('../../utils/resolveUser');
+const { opts } = require('../../utils/v2Reply');
 
 module.exports = {
   name: 'modstats',
@@ -22,8 +23,8 @@ module.exports = {
       warns = await db.warn.list(target.id, message.guild.id);
     } catch { /* db not ready */ }
     const joinDate = target.joinedAt ? `<t:${Math.floor(target.joinedAt.getTime() / 1000)}:R>` : 'Unknown';
-    return message.reply({ embeds: [responseBuilder.buildResult({ title: `Mod Stats: ${target.user.tag}`, fields: [{ name: 'Warnings', value: String(warns.length), inline: true },
+    return message.reply(opts(responseBuilder.buildResult({ title: `Mod Stats: ${target.user.tag}`, fields: [{ name: 'Warnings', value: String(warns.length), inline: true },
         { name: 'Roles', value: String(target.roles.cache.size - 1), inline: true },
-        { name: 'Joined', value: joinDate, inline: true }], thumbnail: target.user.displayAvatarURL({ size: 128 })})], allowedMentions: { parse: [] } });
+        { name: 'Joined', value: joinDate, inline: true }], thumbnail: target.user.displayAvatarURL({ size: 128 })}), { allowedMentions: { parse: [] } }));
   },
 };

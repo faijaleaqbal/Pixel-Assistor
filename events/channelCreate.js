@@ -1,9 +1,10 @@
 // src/events/channelCreate.js
 // Anti-nuke: rate-limits channel creation (5 in 10s). Deletes + punishes on abuse.
 
-const { EmbedBuilder, AuditLogEvent } = require('discord.js');
+const { AuditLogEvent } = require('discord.js');
 const { getDb } = require('../utils/db');
 const logger = require('../utils/logger');
+const { buildContainer } = require('../utils/v2Reply');
 const { sendLog, punish, isExempt, RED } = require('./antinukeHelpers');
 
 // In-memory rate-limit tracker: Map<guildId_userId, timestamps[]>
@@ -55,11 +56,12 @@ module.exports = {
 
       if (arr.length > MAX) {
         // Log
-        await sendLog(guild, cfg, client, new EmbedBuilder().setColor(RED)
-          .setAuthor({ name: user.tag, iconURL: user.displayAvatarURL() })
-          .setTitle('🛑 Channel Creation Spam')
-          .setDescription(`**${user.tag}** created **${arr.length}** channels in ${WINDOW / 1000}s — deleting <#${channel.id}>`)
-          .setTimestamp());
+        await sendLog(guild, cfg, client, buildContainer({
+          emoji: '🛑',
+          title: 'Channel Creation Spam',
+          description: `**${user.tag}** created **${arr.length}** channels in ${WINDOW / 1000}s — deleting <#${channel.id}>`,
+          color: RED,
+        }));
 
         // Undo: delete the channel
         await channel.delete('Anti-nuke: creation spam').catch(() => {});

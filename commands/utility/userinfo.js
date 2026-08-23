@@ -1,6 +1,7 @@
 // src/commands/utility/userinfo.js
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts, buildContainer } = require('../../utils/v2Reply');
 const { getDb } = require('../../utils/db');
 const { resolveUserArg } = require('../../utils/resolveUser');
 
@@ -16,7 +17,7 @@ module.exports = {
       ? (await resolveUserArg(message, args[0], { silent: true })) || message.author
       : message.author;
     const member = await message.guild.members.fetch(target.id).catch(() => null);
-    if (!member) return message.reply({ content: 'Member not found in this guild.', allowedMentions: { parse: [] } });
+    if (!member) return message.reply(opts(buildContainer({ description: 'Member not found in this guild.' }), { allowedMentions: { parse: [] } }));
 
     const roles = member.roles?.cache
       ? member.roles.cache.filter((r) => r.id !== message.guild.id).map((r) => `<@&${r.id}>`).slice(0, 15).join(', ') || '—'
@@ -38,7 +39,7 @@ module.exports = {
         { name: 'Warns', value: String(warns), inline: true },
         { name: 'Reaction Wins', value: String(reaction), inline: true },
         { name: `Roles [${roleCount}]`, value: roles, inline: false },], thumbnail: avatarUrl});
-    return message.reply({ embeds: [e], allowedMentions: { parse: [] } });
+    return message.reply(opts(e, { allowedMentions: { parse: [] } }));
   },
 };
 

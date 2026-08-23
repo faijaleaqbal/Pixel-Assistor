@@ -26,6 +26,7 @@
 
 const responseBuilder = require('../../utils/responseBuilder');
 const config = require('../../utils/config');
+const { opts } = require('../../utils/v2Reply');
 const { convert, isFiat } = require('../../utils/cryptoApi');
 
 const PURPLE = 0x5865F2, RED = 0xED4245, YELLOW = 0xFEE75C;
@@ -86,11 +87,9 @@ module.exports = {
       || looksHex;
 
     if (amountMissing) {
-      return message.reply({
-        embeds: [responseBuilder.buildResult({ description: `⚠️ | You are missing the amount argument!\n` +
-            `> Usage: \`${config.prefix}convert <amount> <base> <target>\`\n` +
-            `> Example: \`${config.prefix}convert 100 usd inr\``})]
-      });
+      return message.reply(opts(responseBuilder.buildResult({ description: `⚠️ | You are missing the amount argument!\n` +
+          `> Usage: \`${config.prefix}convert <amount> <base> <target>\`\n` +
+          `> Example: \`${config.prefix}convert 100 usd inr\``})));
     }
 
     const amount = firstAsFloat;
@@ -98,17 +97,15 @@ module.exports = {
     const target = String(args[2] || '').toLowerCase();
 
     if (!base || !target) {
-      return message.reply({
-        embeds: [responseBuilder.buildResult({ description: `⚠️ | You are missing the ${!base ? 'base' : 'target'} argument!\n` +
-            `> Usage: \`${config.prefix}convert <amount> <base> <target>\`\n` +
-            `> Example: \`${config.prefix}convert 100 usd inr\``})]
-      });
+      return message.reply(opts(responseBuilder.buildResult({ description: `⚠️ | You are missing the ${!base ? 'base' : 'target'} argument!\n` +
+          `> Usage: \`${config.prefix}convert <amount> <base> <target>\`\n` +
+          `> Example: \`${config.prefix}convert 100 usd inr\``})));
     }
 
     // Light acknowledgement while we fetch live rates.
-    const m = await message.reply({
-      embeds: [responseBuilder.buildResult({ description: '⏳ Fetching live rates…'})]
-    });
+    const m = await message.reply(
+      opts(responseBuilder.buildResult({ description: '⏳ Fetching live rates…'}))
+    );
 
     try {
       const result = await convert(amount, base, target);
@@ -116,9 +113,9 @@ module.exports = {
       const baseStr = formatBaseAmount(amount, base);
       const resultStr = formatAmount(result, target);
 
-      return m.edit({
-        embeds: [responseBuilder.buildResult({ title: '💱 | Conversion Result', description: `> ${baseStr} ${base.toUpperCase()} = ${resultStr} ${target.toUpperCase()}`})]
-      });
+      return m.edit(
+        opts(responseBuilder.buildResult({ title: '💱 | Conversion Result', description: `> ${baseStr} ${base.toUpperCase()} = ${resultStr} ${target.toUpperCase()}`}))
+      );
     } catch (e) {
       const msg = e?.message || 'Unknown error';
       let desc = `Conversion failed: **${msg}**`;
@@ -127,7 +124,7 @@ module.exports = {
       } else if (msg.includes('not supported')) {
         desc = `❌ ${msg}`;
       }
-      return m.edit({ embeds: [responseBuilder.buildResult({ description: desc})] });
+      return m.edit(opts(responseBuilder.buildResult({ description: desc})));
     }
   },
 };

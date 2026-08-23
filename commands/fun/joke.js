@@ -1,5 +1,6 @@
 // src/commands/fun/joke.js
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts } = require('../../utils/v2Reply');
 const { getJson } = require('../../utils/http');
 
 module.exports = {
@@ -16,9 +17,9 @@ module.exports = {
       const desc = data.type === 'twopart' ? `**${data.setup}**\n\n||${data.delivery}||` : data.joke;
       const embed = responseBuilder.buildResult({ title: '😂 Joke', description: desc || 'No joke text available.'});
 
-      return message.reply({ embeds: [embed] });
+      return message.reply(opts(embed));
     } catch {
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: 'Failed to fetch joke. Please try again.'})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: 'Failed to fetch joke. Please try again.'})));
     }
   },
 };

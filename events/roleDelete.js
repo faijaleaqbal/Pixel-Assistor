@@ -1,9 +1,10 @@
 // src/events/roleDelete.js
 // Anti-nuke: detects unauthorized role deletion and recreates it.
 
-const { EmbedBuilder, AuditLogEvent } = require('discord.js');
+const { AuditLogEvent } = require('discord.js');
 const { getDb } = require('../utils/db');
 const logger = require('../utils/logger');
+const { buildContainer } = require('../utils/v2Reply');
 const { fetchAuditEntry, sendLog, punish, isExempt, RED, ORANGE } = require('./antinukeHelpers');
 
 module.exports = {
@@ -22,14 +23,16 @@ module.exports = {
       if (await isExempt(user, guild, cfg, client)) return;
 
       // Log
-      await sendLog(guild, cfg, client, new EmbedBuilder().setColor(RED)
-        .setAuthor({ name: user.tag, iconURL: user.displayAvatarURL() })
-        .setTitle('🛑 Role Deleted')
-        .setDescription(`**${user.tag}** deleted role **${role.name}**`)
-        .addFields(
-          { name: 'Color', value: role.hexColor, inline: true },
-          { name: 'Punishment', value: `\`${cfg.punishment}\``, inline: true },
-        ).setTimestamp());
+      await sendLog(guild, cfg, client, buildContainer({
+        emoji: '🛑',
+        title: 'Role Deleted',
+        description: `**${user.tag}** deleted role **${role.name}**`,
+        fields: [
+          { name: 'Color', value: role.hexColor },
+          { name: 'Punishment', value: `\`${cfg.punishment}\`` },
+        ],
+        color: RED,
+      }));
 
       // Undo: recreate role
       try {
@@ -41,14 +44,20 @@ module.exports = {
           mentionable: role.mentionable,
         });
 
-        await sendLog(guild, cfg, client, new EmbedBuilder().setColor(ORANGE)
-          .setTitle('🔄 Role Recreated')
-          .setDescription(`Recreated as <@&${newRole.id}>`));
+        await sendLog(guild, cfg, client, buildContainer({
+          emoji: '🔄',
+          title: 'Role Recreated',
+          description: `Recreated as <@&${newRole.id}>`,
+          color: ORANGE,
+        }));
       } catch (createErr) {
         logger.warn(`roleDelete anti-nuke: failed to recreate role ${role.name}`, createErr.message);
-        await sendLog(guild, cfg, client, new EmbedBuilder().setColor(RED)
-          .setTitle('⚠️ Role Recreate Failed')
-          .setDescription(`Could not recreate **${role.name}**: **${createErr.message}**`));
+        await sendLog(guild, cfg, client, buildContainer({
+          emoji: '⚠️',
+          title: 'Role Recreate Failed',
+          description: `Could not recreate **${role.name}**: **${createErr.message}**`,
+          color: RED,
+        }));
       }
 
       await punish(guild, cfg, user);

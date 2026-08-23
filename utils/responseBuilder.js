@@ -1,8 +1,10 @@
 // src/utils/responseBuilder.js
 // Centralized response design system for Pixel-Assistor.
-// Unifies the visual language across all 124 commands in 8 categories.
+// Unifies the visual language across all 125 commands in 8 categories.
+// All builders return Components V2 containers (discord.js >= 14.17).
+// Send them via v2Reply.opts(): { components: [...], flags: MessageFlags.IsComponentsV2 }
 
-const { EmbedBuilder } = require('discord.js');
+const { buildContainer, hexToInt } = require('./v2Reply');
 const config = require('./config');
 
 const COLORS = {
@@ -86,6 +88,16 @@ function formatDescription({
   return parts.join('\n');
 }
 
+// Wraps the pre-formatted markdown into a V2 container.
+function buildV2({ color, thumbnail, image }, formattedDescription) {
+  return buildContainer({
+    description: formattedDescription,
+    color: hexToInt(color),
+    thumbnail,
+    image,
+  });
+}
+
 function buildSuccess({
   title = 'Success',
   emoji = '✅',
@@ -100,10 +112,7 @@ function buildSuccess({
   customFooter,
 } = {}) {
   const desc = formatDescription({ title, emoji, fields, description, content, client, devName, customFooter });
-  const embed = new EmbedBuilder().setColor(color).setDescription(desc);
-  if (thumbnail) embed.setThumbnail(thumbnail);
-  if (image) embed.setImage(image);
-  return embed;
+  return buildV2({ color, thumbnail, image }, desc);
 }
 
 function buildError({
@@ -128,7 +137,7 @@ function buildError({
   }
 
   const desc = formatDescription({ title, emoji, fields: allFields, description, content, client, devName, customFooter });
-  return new EmbedBuilder().setColor(color).setDescription(desc);
+  return buildV2({ color }, desc);
 }
 
 function buildWarning({
@@ -145,10 +154,7 @@ function buildWarning({
   customFooter,
 } = {}) {
   const desc = formatDescription({ title, emoji, fields, description, content, client, devName, customFooter });
-  const embed = new EmbedBuilder().setColor(color).setDescription(desc);
-  if (thumbnail) embed.setThumbnail(thumbnail);
-  if (image) embed.setImage(image);
-  return embed;
+  return buildV2({ color, thumbnail, image }, desc);
 }
 
 function buildInfo({
@@ -165,10 +171,7 @@ function buildInfo({
   customFooter,
 } = {}) {
   const desc = formatDescription({ title, emoji, fields, description, content, client, devName, customFooter });
-  const embed = new EmbedBuilder().setColor(color).setDescription(desc);
-  if (thumbnail) embed.setThumbnail(thumbnail);
-  if (image) embed.setImage(image);
-  return embed;
+  return buildV2({ color, thumbnail, image }, desc);
 }
 
 function buildResult({
@@ -185,10 +188,7 @@ function buildResult({
   customFooter,
 } = {}) {
   const desc = formatDescription({ title, emoji, fields, description, content, client, devName, customFooter });
-  const embed = new EmbedBuilder().setColor(color).setDescription(desc);
-  if (thumbnail) embed.setThumbnail(thumbnail);
-  if (image) embed.setImage(image);
-  return embed;
+  return buildV2({ color, thumbnail, image }, desc);
 }
 
 function buildPermissionDenied({ required, title = 'Permission Denied', emoji = '🔒', client }) {

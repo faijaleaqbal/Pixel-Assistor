@@ -2,6 +2,7 @@
 // Set or clear a role's icon.
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts, buildContainer } = require('../../utils/v2Reply');
 
 module.exports = {
   name: 'roleicon',
@@ -14,33 +15,33 @@ module.exports = {
   args: true,
   async execute(message, args, client) {
     const role = message.mentions.roles.first();
-    if (!role) return message.reply('Mention a role.');
+    if (!role) return message.reply(opts(buildContainer({ description: 'Mention a role.' })));
     const arg = args.slice(1).join(' ').trim();
     if (arg === 'reset') {
       try {
         await role.setIcon(null);
-        return message.reply({ embeds: [responseBuilder.buildResult({ description: `Cleared icon for ${role.name}.`})] });
+        return message.reply(opts(responseBuilder.buildResult({ description: `Cleared icon for ${role.name}.`})));
       } catch (e) {
-        return message.reply({ embeds: [responseBuilder.buildResult({ description: `Failed to clear icon: **${e.message}**`})] });
+        return message.reply(opts(responseBuilder.buildResult({ description: `Failed to clear icon: **${e.message}**`})));
       }
     }
     if (!arg && message.attachments.size) {
       const url = message.attachments.first().url;
       try {
         await role.setIcon(url);
-        return message.reply({ embeds: [responseBuilder.buildResult({ description: `Set ${role.name}'s icon to the attached image.`})] });
+        return message.reply(opts(responseBuilder.buildResult({ description: `Set ${role.name}'s icon to the attached image.`})));
       } catch (e) {
-        return message.reply({ embeds: [responseBuilder.buildResult({ description: `Failed to set icon: **${e.message}**`})] });
+        return message.reply(opts(responseBuilder.buildResult({ description: `Failed to set icon: **${e.message}**`})));
       }
     }
     if (!arg && !message.attachments.size) {
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: 'Provide an emoji or attach an image, or use `reset`.'})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: 'Provide an emoji or attach an image, or use `reset`.'})));
     }
     try {
       await role.setIcon(arg);
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: `Set ${role.name}'s icon to ${arg}.`})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: `Set ${role.name}'s icon to ${arg}.`})));
     } catch (e) {
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: `Failed to set icon: **${e.message}**`})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: `Failed to set icon: **${e.message}**`})));
     }
   },
 };

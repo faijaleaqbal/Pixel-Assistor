@@ -9,6 +9,7 @@ const cooldowns = require('../utils/cooldowns');
 const { hasPermission, isOwner, checkBotPermissions } = require('../utils/perms');
 const { AppError } = require('../utils/errors');
 const { safeReply } = require('../utils/interactionHelper');
+const { opts } = require('../utils/v2Reply');
 
 /**
  * Executes a prefix command through the verified pipeline.
@@ -29,7 +30,7 @@ async function executePrefixCommand(cmd, message, args, client, prefix) {
       const missing = cmd.permissions.filter((p) => !hasPermission(message.member, p));
       if (missing.length) {
         const embed = responseBuilder.buildPermissionDenied({ required: missing.join(', '), client });
-        return message.reply({ embeds: [embed], allowedMentions: { parse: [] } }).catch(() => {});
+        return message.reply(opts(embed, { allowedMentions: { parse: [] } })).catch(() => {});
       }
     }
 
@@ -42,7 +43,7 @@ async function executePrefixCommand(cmd, message, args, client, prefix) {
           required: botCheck.missing.join(', '),
           client,
         });
-        return message.reply({ embeds: [embed], allowedMentions: { parse: [] } }).catch(() => {});
+        return message.reply(opts(embed, { allowedMentions: { parse: [] } })).catch(() => {});
       }
     }
 
@@ -55,7 +56,7 @@ async function executePrefixCommand(cmd, message, args, client, prefix) {
         fields: [{ name: 'Slow down', value: `Please wait **${cd}s** before using this command again.` }],
         client,
       });
-      return message.reply({ embeds: [embed], allowedMentions: { parse: [] } }).catch(() => {});
+      return message.reply(opts(embed, { allowedMentions: { parse: [] } })).catch(() => {});
     }
 
     // 5. Required arguments check
@@ -67,7 +68,7 @@ async function executePrefixCommand(cmd, message, args, client, prefix) {
         usage: `${prefix}${cmd.name}${usageStr}`,
         client,
       });
-      return message.reply({ embeds: [embed], allowedMentions: { parse: [] } }).catch(() => {});
+      return message.reply(opts(embed, { allowedMentions: { parse: [] } })).catch(() => {});
     }
 
     // 6. Execute command
@@ -110,7 +111,7 @@ async function executeSlashCommand(cmd, interaction, client) {
         error: 'This command is restricted to the bot owner.',
         client,
       });
-      return safeReply(interaction, { embeds: [embed], ephemeral: true });
+      return safeReply(interaction, opts(embed, { ephemeral: true }));
     }
 
     // 2. Member permissions check
@@ -118,7 +119,7 @@ async function executeSlashCommand(cmd, interaction, client) {
       const missing = cmd.permissions.filter((p) => !hasPermission(interaction.member, p));
       if (missing.length) {
         const embed = responseBuilder.buildPermissionDenied({ required: missing.join(', '), client });
-        return safeReply(interaction, { embeds: [embed], ephemeral: true });
+        return safeReply(interaction, opts(embed, { ephemeral: true }));
       }
     }
 
@@ -131,7 +132,7 @@ async function executeSlashCommand(cmd, interaction, client) {
           required: botCheck.missing.join(', '),
           client,
         });
-        return safeReply(interaction, { embeds: [embed], ephemeral: true });
+        return safeReply(interaction, opts(embed, { ephemeral: true }));
       }
     }
 
@@ -144,7 +145,7 @@ async function executeSlashCommand(cmd, interaction, client) {
         fields: [{ name: 'Slow down', value: `Please wait **${cd}s** before using this command again.` }],
         client,
       });
-      return safeReply(interaction, { embeds: [embed], ephemeral: true });
+      return safeReply(interaction, opts(embed, { ephemeral: true }));
     }
 
     // 5. Execute slash handler
@@ -156,7 +157,7 @@ async function executeSlashCommand(cmd, interaction, client) {
         description: `\`${cmd.name}\` is currently available via message prefix.`,
         client,
       });
-      await safeReply(interaction, { embeds: [embed], ephemeral: true });
+      await safeReply(interaction, opts(embed, { ephemeral: true }));
     }
 
     const duration = Date.now() - start;
@@ -175,14 +176,14 @@ async function executeSlashCommand(cmd, interaction, client) {
       client,
     });
 
-    return safeReply(interaction, { embeds: [errEmbed], ephemeral: true });
+    return safeReply(interaction, opts(errEmbed, { ephemeral: true }));
   }
 }
 
 async function replyError(message, text, title = 'Command Failed', emoji = '❌', client) {
   const embed = responseBuilder.buildError({ title, emoji, error: text, client });
   try {
-    await message.reply({ embeds: [embed], allowedMentions: { parse: [] } });
+    await message.reply(opts(embed, { allowedMentions: { parse: [] } }));
   } catch {
     // Message channel permissions might block reply
   }

@@ -1,8 +1,8 @@
 // src/events/guildMemberRemove.js
 // Stores persisted roles + sends leave message.
 
-const { EmbedBuilder } = require('discord.js');
 const { getDb } = require('../utils/db');
+const { opts, buildContainer } = require('../utils/v2Reply');
 
 module.exports = {
   name: 'guildMemberRemove',
@@ -27,8 +27,13 @@ module.exports = {
           const text = gCfg.leaveMsg
             .replace(/{user}/g, member.user.tag)
             .replace(/{server}/g, member.guild.name);
-          const embed = new EmbedBuilder().setColor(0xED4245).setTitle('Goodbye!').setDescription(text).setThumbnail(member.user.displayAvatarURL({ size: 128 })).setTimestamp();
-          await ch.send({ embeds: [embed] }).catch(() => {});
+          const container = buildContainer({
+            title: 'Goodbye!',
+            description: text,
+            color: '#ED4245',
+            thumbnail: member.user.displayAvatarURL({ size: 128 }),
+          });
+          await ch.send(opts(container)).catch(() => {});
         }
       }
     } catch { /* ignore */ }

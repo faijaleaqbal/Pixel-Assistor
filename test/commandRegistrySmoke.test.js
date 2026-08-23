@@ -13,6 +13,7 @@ const kickCmd = require('../commands/moderation/kick');
 const muteCmd = require('../commands/moderation/mute');
 const timeoutCmd = require('../commands/moderation/timeout');
 const { isExempt, punish } = require('../events/antinukeHelpers');
+const v2 = require('./helpers/v2');
 
 describe('Command Registry & Smoke Tests', () => {
   const mockClient = { commands: new Map() };
@@ -186,19 +187,19 @@ describe('High-Risk Moderation Commands Security & Hierarchy', () => {
 
     // 1. Try to ban server owner
     await banCmd.execute(mockMsg, [OWNER_ID]);
-    assert.match(replied.embeds[0].data.description, /cannot ban the server owner/);
+    assert.match(v2(replied), /cannot ban the server owner/);
 
     // 2. Try to ban self
     await banCmd.execute(mockMsg, [MOD_ID]);
-    assert.match(replied.embeds[0].data.description, /cannot ban yourself/);
+    assert.match(v2(replied), /cannot ban yourself/);
 
     // 3. Try to ban bot
     await banCmd.execute(mockMsg, [BOT_ID]);
-    assert.match(replied.embeds[0].data.description, /cannot ban myself/);
+    assert.match(v2(replied), /cannot ban myself/);
 
     // 4. Try to ban higher member
     await banCmd.execute(mockMsg, [HIGHER_ID]);
-    assert.match(replied.embeds[0].data.description, /equal to or higher/);
+    assert.match(v2(replied), /equal to or higher/);
   });
 
   it('Kick: blocks kicking server owner, self, bot, and higher-ranked members', async () => {
@@ -213,19 +214,19 @@ describe('High-Risk Moderation Commands Security & Hierarchy', () => {
 
     // 1. Try to kick server owner
     await kickCmd.execute(mockMsg, [OWNER_ID]);
-    assert.match(replied.embeds[0].data.description, /cannot kick the server owner/);
+    assert.match(v2(replied), /cannot kick the server owner/);
 
     // 2. Try to kick self
     await kickCmd.execute(mockMsg, [MOD_ID]);
-    assert.match(replied.embeds[0].data.description, /cannot kick yourself/);
+    assert.match(v2(replied), /cannot kick yourself/);
 
     // 3. Try to kick bot
     await kickCmd.execute(mockMsg, [BOT_ID]);
-    assert.match(replied.embeds[0].data.description, /cannot kick myself/);
+    assert.match(v2(replied), /cannot kick myself/);
 
     // 4. Try to kick higher member
     await kickCmd.execute(mockMsg, [HIGHER_ID]);
-    assert.match(replied.embeds[0].data.description, /equal or higher role/);
+    assert.match(v2(replied), /equal or higher role/);
   });
 
   it('Mute/Timeout: validates duration limits (1s to 28d) and rejects invalid durations', async () => {
@@ -240,10 +241,10 @@ describe('High-Risk Moderation Commands Security & Hierarchy', () => {
 
     // Invalid duration
     await muteCmd.execute(mockMsg, [LOWER_ID, '50d']);
-    assert.match(replied.embeds[0].data.description, /Duration must be between 1s and 28d/);
+    assert.match(v2(replied), /Duration must be between 1s and 28d/);
 
     await timeoutCmd.execute(mockMsg, [LOWER_ID, 'invalid_time']);
-    assert.match(replied.embeds[0].data.description, /Invalid duration/);
+    assert.match(v2(replied), /Invalid duration/);
   });
 
   it('Anti-Nuke: protects server owner, bot, and configured owners from punishment', async () => {

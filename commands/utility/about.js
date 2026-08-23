@@ -3,6 +3,7 @@ const responseBuilder = require('../../utils/responseBuilder');
 // Bot information with credits, uptime, and runtime stats.
 
 const { version: djsVersion } = require('discord.js');
+const { opts } = require('../../utils/v2Reply');
 
 module.exports = {
   name: 'about',
@@ -29,6 +30,6 @@ module.exports = {
         { name: 'Uptime', value: `${days}d ${hours}h ${mins}m ${secs}s`, inline: true },
         { name: 'Memory', value: `${(mem.rss / 1024 / 1024).toFixed(2)} MB`, inline: true },], thumbnail: client.user.displayAvatarURL({ size: 512 })});
 
-    return message.reply({ embeds: [embed] });
+    return message.reply(opts(embed));
   },
 };

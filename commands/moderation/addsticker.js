@@ -1,6 +1,7 @@
 // src/commands/moderation/addsticker.js
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts, buildContainer } = require('../../utils/v2Reply');
 
 module.exports = {
   name: 'addsticker',
@@ -13,7 +14,7 @@ module.exports = {
   async execute(message, args, client) {
     const name = args[0];
     const url = args[1];
-    if (!name || !url) return message.reply('Usage: `addsticker <name> <url> [description]`');
+    if (!name || !url) return message.reply(opts(buildContainer({ description: 'Usage: `addsticker <name> <url> [description]`' })));
     const description = args.slice(2).join(' ') || name;
     try {
       // Discord requires `tags` to be a unicode emoji (used as the sticker's
@@ -21,9 +22,9 @@ module.exports = {
       // We default to ✨ if the description is multi-char / not an emoji.
       const tags = /^(\p{Extended_Pictographic}|\p{Emoji})$/u.test(description) ? description : '✨';
       const sticker = await message.guild.stickers.create({ name, file: url, tags, description });
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: `✅ Sticker added: **${sticker.name}** (\`${sticker.id}\`)`})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: `✅ Sticker added: **${sticker.name}** (\`${sticker.id}\`)`})));
     } catch (err) {
-      return message.reply({ embeds: [responseBuilder.buildResult({ description: `Failed to add sticker: ${err.message}`})] });
+      return message.reply(opts(responseBuilder.buildResult({ description: `Failed to add sticker: ${err.message}`})));
     }
   },
 };

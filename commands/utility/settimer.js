@@ -4,6 +4,7 @@
 // Duration format: <number><unit> where unit = s, m, h, d, w, y
 
 const responseBuilder = require('../../utils/responseBuilder');
+const { opts } = require('../../utils/v2Reply');
 const { getDb } = require('../../utils/db');
 const ms = require('../../utils/ms');
 const logger = require('../../utils/logger');
@@ -18,11 +19,9 @@ module.exports = {
   async execute(message, args, client) {
     const durMs = ms.parse(args[0]);
     if (!durMs || durMs < 1000) {
-      return message.reply({
-        embeds: [responseBuilder.buildResult({ description: 'Invalid duration. Usage: `?settimer <duration> [reason]`\n' +
-          'Format: `<number><unit>` where unit = `s`, `m`, `h`, `d`, `w`, `y`\n' +
-          'Examples: `?settimer 30s`, `?settimer 5m Standup call`, `?settimer 1h`, `?settimer 2d`'})],
-      });
+      return message.reply(opts(responseBuilder.buildResult({ description: 'Invalid duration. Usage: `?settimer <duration> [reason]`\n' +
+        'Format: `<number><unit>` where unit = `s`, `m`, `h`, `d`, `w`, `y`\n' +
+        'Examples: `?settimer 30s`, `?settimer 5m Standup call`, `?settimer 1h`, `?settimer 2d`'})));
     }
 
     const reason = args.slice(1).join(' ') || 'No reason provided.';
@@ -32,7 +31,7 @@ module.exports = {
 
     const timerEmbed = responseBuilder.buildResult({ title: '⏳ Timer', description: `**${reason}** — ends <t:${triggerUnix}:R>`});
 
-    const sent = await message.reply({ embeds: [timerEmbed] });
+    const sent = await message.reply(opts(timerEmbed));
 
     // Store in DB for crash-recovery
     try {

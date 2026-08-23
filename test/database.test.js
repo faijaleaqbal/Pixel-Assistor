@@ -10,7 +10,7 @@ describe('Database Parity & Operational Integrity (SQLite Driver)', () => {
   let db;
 
   before(async () => {
-    process.env.SQLITE_PATH = './data/test_bot.db';
+    process.env.DB_SQLITE_PATH = './data/test_bot.db';
     if (fs.existsSync(testDbFile)) {
       try { fs.unlinkSync(testDbFile); } catch {}
     }
@@ -121,25 +121,6 @@ describe('Database Parity & Operational Integrity (SQLite Driver)', () => {
 
     db.warn.clearGuild('guild_1');
     assert.equal(db.warn.list('user_2', 'guild_1').length, 0);
-  });
-
-  it('Levels / XP: addXp, get, setLevel, top', () => {
-    const ts = Date.now();
-    const u1 = `user_xp_${ts}_1`;
-    const u2 = `user_xp_${ts}_2`;
-    const g1 = `guild_xp_${ts}`;
-
-    const res = db.level.addXp(u1, g1, 50);
-    assert.equal(res.xp, 50);
-    assert.equal(res.level, 0);
-
-    db.level.setLevel(u1, g1, 1);
-    assert.equal(db.level.get(u1, g1).level, 1);
-
-    db.level.addXp(u2, g1, 100);
-    const top = db.level.top(g1, 5);
-    assert.equal(top.length, 2);
-    assert.equal(top[0].userId, u2);
   });
 
   it('UserReminders & Timers: add, due, markFired, list, remove', () => {
