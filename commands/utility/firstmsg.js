@@ -22,10 +22,17 @@ module.exports = {
     if (!first) return message.reply(opts(buildContainer({ description: 'Could not find the first message.' })));
 
     const content = first.content?.slice(0, 1024) || '*No text content*';
+    const jumpUrl = first.url || `https://discord.com/channels/${first.guildId || message.guild?.id || '@me'}/${first.channelId}/${first.id}`;
 
-    const embed = responseBuilder.buildResult({ title: '📜 First Message', fields: [{ name: 'Author', value: `${first.author.tag} (${first.author.id})`, inline: true },
+    const embed = responseBuilder.buildResult({
+      title: '📜 First Message',
+      fields: [
+        { name: 'Author', value: `${first.author.tag} (${first.author.id})`, inline: true },
         { name: 'Date', value: `<t:${Math.floor(first.createdTimestamp / 1000)}:R>`, inline: true },
-        { name: 'Content', value: content, inline: false },]});
+        { name: 'Content', value: content, inline: false },
+        { name: 'Jump', value: `[Jump to message](${jumpUrl})`, inline: false },
+      ],
+    });
 
     return message.reply(opts(embed));
   },
