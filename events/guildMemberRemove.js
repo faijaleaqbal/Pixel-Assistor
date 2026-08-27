@@ -1,14 +1,39 @@
-// src/events/guildMemberRemove.js
-// Stores persisted roles + sends leave message.
-
 const { getDb } = require('../utils/db');
 const { opts, buildContainer } = require('../utils/v2Reply');
+const { fetchAuditEntry, sendLog, punish, isExempt, RED, AuditLogEvent } = require('./antinukeHelpers');
+const logger = require('../utils/logger');
 
 module.exports = {
   name: 'guildMemberRemove',
   async execute(member) {
     try {
       const db = getDb();
+
+      // 0. Anti-nuke: unauthorized kick detection
+      try {
+        const antinukeCfg = await db.antinuke.get(member.guild.id);
+        if (antinukeCfg && antinukeCfg.enabled) {
+          const entry = await fetchAuditEntry(member.guild, AuditLogEvent.MemberKick, member.id);
+          if (entry && entry.executor) {
+            const isAllowed = await isExempt(entry.executor, member.guild, antinukeCfg, member.client);
+            if (!isAllowed) {
+              await sendLog(member.guild, antinukeCfg, member.client, buildContainer({
+                emoji: '🛑',
+                title: 'Unauthorized Member Kick',
+                description: `**${entry.executor.tag}** kicked **${member.user.tag}** without authorization.`,
+                fields: [
+                  { name: 'Target', value: `${member.user.tag} (\`${member.id}\`)` },
+                  { name: 'Punishment', value: `\`${antinukeCfg.punishment}\`` },
+                ],
+                color: RED,
+              }));
+              await punish(member.guild, antinukeCfg, entry.executor, 'Anti-nuke: unauthorized member kick');
+            }
+          }
+        }
+      } catch (kickErr) {
+        logger.warn('anti-nuke kick check error', kickErr.message);
+      }
 
       // Persist-role save
       const saved = await db.persistRole.get(member.id, member.guild.id);

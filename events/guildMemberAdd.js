@@ -4,12 +4,43 @@
 const { getDb } = require('../utils/db');
 const logger = require('../utils/logger');
 const { opts, buildContainer } = require('../utils/v2Reply');
+const { fetchAuditEntry, sendLog, punish, isExempt, RED, AuditLogEvent } = require('./antinukeHelpers');
 
 module.exports = {
   name: 'guildMemberAdd',
   async execute(member) {
     try {
       const db = getDb();
+
+      // 0. Anti-nuke: unauthorized bot addition check
+      if (member.user.bot) {
+        try {
+          const antinukeCfg = await db.antinuke.get(member.guild.id);
+          if (antinukeCfg && antinukeCfg.enabled) {
+            const entry = await fetchAuditEntry(member.guild, AuditLogEvent.BotAdd, member.id);
+            if (entry && entry.executor) {
+              const isAllowed = await isExempt(entry.executor, member.guild, antinukeCfg, member.client);
+              if (!isAllowed) {
+                await member.kick('Anti-nuke: unauthorized bot addition').catch(() => {});
+                await sendLog(member.guild, antinukeCfg, member.client, buildContainer({
+                  emoji: '🛑',
+                  title: 'Unauthorized Bot Added',
+                  description: `**${entry.executor.tag}** added bot **${member.user.tag}** without authorization.`,
+                  fields: [
+                    { name: 'Bot Tag', value: `${member.user.tag} (\`${member.id}\`)` },
+                    { name: 'Punishment', value: `\`${antinukeCfg.punishment}\`` },
+                  ],
+                  color: RED,
+                }));
+                await punish(member.guild, antinukeCfg, entry.executor, 'Anti-nuke: unauthorized bot addition');
+                return;
+              }
+            }
+          }
+        } catch (botErr) {
+          logger.warn('anti-nuke bot add error', botErr.message);
+        }
+      }
 
       // 1. Persist-role restore
       const roleIds = await db.persistRole.get(member.id, member.guild.id);
