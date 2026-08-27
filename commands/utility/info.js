@@ -2,6 +2,7 @@
 // Bot info — Components V2 container via the shared v2Reply helper.
 
 const { opts, buildContainer } = require('../../utils/v2Reply');
+const { getPrefix } = require('../../utils/prefixCache');
 
 module.exports = {
   name: 'info',
@@ -14,22 +15,24 @@ module.exports = {
   slashOptions: [],
 
   async execute(message) {
-    await message.reply(payload());
+    const prefix = await getPrefix(message.guild?.id);
+    await message.reply(payload(prefix));
   },
 
   async slashExecute(interaction) {
-    await interaction.reply(payload());
+    const prefix = await getPrefix(interaction.guildId);
+    await interaction.reply(payload(prefix));
   },
 };
 
-function payload() {
+function payload(prefix = '?') {
   return opts(buildContainer({
     title: 'Pixel Assistant',
     emoji: '🤖',
     color: '#5865F2',
     description: 'A production-ready Discord bot with crypto tracking, moderation, games and utilities.',
     fields: [
-      { name: 'Prefix', value: '`?`' },
+      { name: 'Prefix', value: `\`${prefix}\`` },
       { name: 'Slash', value: '`/help` for all commands' },
       { name: 'Uptime', value: '24/7 hosted' },
     ],

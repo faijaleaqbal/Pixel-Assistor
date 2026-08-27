@@ -15,6 +15,7 @@ const {
 } = require('discord.js');
 const config = require('../../utils/config');
 const { opts, buildContainer } = require('../../utils/v2Reply');
+const { getPrefix } = require('../../utils/prefixCache');
 const {
   parseTransaction,
   parseTxCommandInput,
@@ -92,20 +93,21 @@ module.exports = {
   args: true,
 
   async execute(message, args, client) {
+    const prefix = await getPrefix(message.guild?.id);
     const { explicitNetwork, txIdentifier, walletAddress } = parseTxCommandInput(args);
 
     if (!txIdentifier) {
       return message.reply(
         opts(responseBuilder.buildResult({
           title: 'Missing Transaction Identifier',
-          description: `Usage: \`${config.prefix}tx [network] <hash> [walletAddress]\`\n\n` +
+          description: `Usage: \`${prefix}tx [network] <hash> [walletAddress]\`\n\n` +
             `**Examples:**\n` +
-            `• \`${config.prefix}tx btc 4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b\`\n` +
-            `• \`${config.prefix}tx doge 7d123...456\`\n` +
-            `• \`${config.prefix}tx polygon 0x1234...\`\n` +
-            `• \`${config.prefix}tx ltc 8d5aac33...\`\n` +
-            `• \`${config.prefix}tx solana 5UfgP...\`\n` +
-            `• \`${config.prefix}tx tron 3a7cab14...\``,
+            `• \`${prefix}tx btc 4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b\`\n` +
+            `• \`${prefix}tx doge 7d123...456\`\n` +
+            `• \`${prefix}tx polygon 0x1234...\`\n` +
+            `• \`${prefix}tx ltc 8d5aac33...\`\n` +
+            `• \`${prefix}tx solana 5UfgP...\`\n` +
+            `• \`${prefix}tx tron 3a7cab14...\``,
         }))
       );
     }
@@ -147,7 +149,7 @@ module.exports = {
             `• **EVM Chains:** \`0x...\` (66 hex characters)\n` +
             `• **Solana:** Base58 signature (~87-89 characters)\n` +
             `• **Bitcoin / Litecoin / Dogecoin / Tron:** 64 hexadecimal characters\n\n` +
-            `You can also specify the network directly: \`${config.prefix}tx <network> <hash>\``,
+            `You can also specify the network directly: \`${prefix}tx <network> <hash>\``,
         }))
       );
     }

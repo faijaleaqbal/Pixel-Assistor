@@ -6,6 +6,7 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require(
 const config = require('../../utils/config');
 const { resolveUserArg } = require('../../utils/resolveUser');
 const { opts, buildContainer } = require('../../utils/v2Reply');
+const { getPrefix } = require('../../utils/prefixCache');
 
 const SYMBOLS = { X: '❌', O: '⭕', EMPTY: '⬜' };
 const WIN_LINES = [
@@ -23,10 +24,11 @@ module.exports = {
   cooldown: 5,
   args: true,
   async execute(message, args, client) {
+    const prefix = await getPrefix(message.guild?.id);
     const opponent = await resolveUserArg(message, args[0]);
     if (!opponent) return;
     if (opponent.bot || opponent.id === message.author.id) {
-      return message.reply(opts(responseBuilder.buildResult({ description: `Mention a valid opponent.\nUsage: \`${config.prefix}tictactoe <@user|userID>\``})));
+      return message.reply(opts(responseBuilder.buildResult({ description: `Mention a valid opponent.\nUsage: \`${prefix}tictactoe <@user|userID>\``})));
     }
 
     const board = Array(9).fill(null);

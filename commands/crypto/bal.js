@@ -18,6 +18,7 @@ const {
 } = require('discord.js');
 const config = require('../../utils/config');
 const { opts, buildContainer } = require('../../utils/v2Reply');
+const { getPrefix } = require('../../utils/prefixCache');
 const {
   detectAddressChain,
   evmFetchBalance,
@@ -159,9 +160,10 @@ module.exports = {
   args: true,
 
   async execute(message, args, client) {
+    const prefix = await getPrefix(message.guild?.id);
     const tokens = (args || []).map((a) => String(a).trim()).filter(Boolean);
     if (!tokens.length) {
-      return message.reply(opts(responseBuilder.buildResult({ description: `Usage: \`${config.prefix}bal [network] <address>\`` })));
+      return message.reply(opts(responseBuilder.buildResult({ description: `Usage: \`${prefix}bal [network] <address>\`` })));
     }
 
     let explicitNetwork = null;
@@ -234,7 +236,7 @@ module.exports = {
             '• **Litecoin:** `L...`, `M...`, `ltc1...`\n' +
             '• **Tron:** `T...` (TRX & TRC-20 tokens)\n' +
             '• **Solana:** Base58 (SOL & SPL tokens)\n\n' +
-            `You can also specify the network directly: \`${config.prefix}bal <network> <address>\``,
+            `You can also specify the network directly: \`${prefix}bal <network> <address>\``,
         }))
       );
     }

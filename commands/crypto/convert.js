@@ -28,6 +28,7 @@ const responseBuilder = require('../../utils/responseBuilder');
 const config = require('../../utils/config');
 const { opts } = require('../../utils/v2Reply');
 const { convert, isFiat } = require('../../utils/cryptoApi');
+const { getPrefix } = require('../../utils/prefixCache');
 
 const PURPLE = 0x5865F2, RED = 0xED4245, YELLOW = 0xFEE75C;
 
@@ -80,6 +81,7 @@ module.exports = {
     const firstAsFloat = parseFloat(first);
     const looksScientific = /^[+-]?\d*\.?\d+e[+-]?\d+$/i.test(first);
     const looksHex = /^0x[0-9a-f]+$/i.test(first);
+    const prefix = await getPrefix(message.guild?.id);
     const amountMissing = !first
       || Number.isNaN(firstAsFloat)
       || firstAsFloat < 0
@@ -88,8 +90,8 @@ module.exports = {
 
     if (amountMissing) {
       return message.reply(opts(responseBuilder.buildResult({ description: `⚠️ | You are missing the amount argument!\n` +
-          `> Usage: \`${config.prefix}convert <amount> <base> <target>\`\n` +
-          `> Example: \`${config.prefix}convert 100 usd inr\``})));
+          `> Usage: \`${prefix}convert <amount> <base> <target>\`\n` +
+          `> Example: \`${prefix}convert 100 usd inr\``})));
     }
 
     const amount = firstAsFloat;
@@ -98,8 +100,8 @@ module.exports = {
 
     if (!base || !target) {
       return message.reply(opts(responseBuilder.buildResult({ description: `⚠️ | You are missing the ${!base ? 'base' : 'target'} argument!\n` +
-          `> Usage: \`${config.prefix}convert <amount> <base> <target>\`\n` +
-          `> Example: \`${config.prefix}convert 100 usd inr\``})));
+          `> Usage: \`${prefix}convert <amount> <base> <target>\`\n` +
+          `> Example: \`${prefix}convert 100 usd inr\``})));
     }
 
     // Light acknowledgement while we fetch live rates.

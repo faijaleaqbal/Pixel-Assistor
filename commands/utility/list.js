@@ -12,6 +12,7 @@ const { getDb } = require('../../utils/db');
 const { hasPermission } = require('../../utils/perms');
 const { resolveUserArg, resolveMemberArg } = require('../../utils/resolveUser');
 const { opts } = require('../../utils/v2Reply');
+const { getPrefix } = require('../../utils/prefixCache');
 
 const BT = String.fromCharCode(96);
 
@@ -200,6 +201,7 @@ module.exports = {
       return message.reply(opts(embed));
     }
 
-    return message.reply(opts(responseBuilder.buildResult({ description: 'Usage: ' + BT + config.prefix + 'list <reminders|upi|warns|admins|mods|bots|bans|boosters|emojis|botemojis|roles|inrole|activedeveloper|early|joinpos|createpos>' + BT})));
+    const prefix = await getPrefix(message.guild?.id);
+    return message.reply(opts(responseBuilder.buildResult({ description: 'Usage: ' + BT + prefix + 'list <reminders|upi|warns|admins|mods|bots|bans|boosters|emojis|botemojis|roles|inrole|activedeveloper|early|joinpos|createpos>' + BT})));
   },
 };

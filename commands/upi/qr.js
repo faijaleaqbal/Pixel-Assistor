@@ -23,6 +23,7 @@ const {
 const config = require('../../utils/config');
 const { opts } = require('../../utils/v2Reply');
 const { getDb } = require('../../utils/db');
+const { getPrefix } = require('../../utils/prefixCache');
 const QRCode = require('qrcode');
 
 const USAGE_EMBED = (prefix) => responseBuilder.buildResult({ title: 'Please use the command in the proper format!', description: '```\n' +
@@ -435,13 +436,14 @@ module.exports = {
   cooldown: 5,
   args: false,  // Changed: args are now optional (interactive mode)
   async execute(message, args, client) {
+    const prefix = await getPrefix(message.guild?.id);
     const parsed = parseArgs(args);
 
     // ── Interactive mode ──
     if (!parsed || parsed.mode === 'interactive') {
       if (!parsed) {
         // Invalid format
-        return message.reply(opts(USAGE_EMBED(config.prefix)));
+        return message.reply(opts(USAGE_EMBED(prefix)));
       }
       return interactiveMode(message);
     }
@@ -450,7 +452,7 @@ module.exports = {
     if (parsed.mode === 'label_default') {
       const rows = await getDb().upi.list(message.author.id);
       if (!rows.length) {
-        return message.reply(opts(responseBuilder.buildResult({ description: `You have no saved UPI IDs. Use \`${config.prefix}setupi <label> <upi-id>\` to save one first, or provide a UPI ID directly like \`${config.prefix}qr user@bank 500\`.`})));
+        return message.reply(opts(responseBuilder.buildResult({ description: `You have no saved UPI IDs. Use \`${prefix}setupi <label> <upi-id>\` to save one first, or provide a UPI ID directly like \`${prefix}qr user@bank 500\`.`})));
       }
       // Use the first saved UPI as default
       const defaultEntry = rows[0];
@@ -472,7 +474,7 @@ module.exports = {
       const rows = await getDb().upi.list(message.author.id);
       const found = rows.find((r) => r.label.toLowerCase() === parsed.label.toLowerCase());
       if (!found) {
-        return message.reply(opts(responseBuilder.buildResult({ description: `No saved UPI under label \`${parsed.label}\`. Run \`${config.prefix}listupi\` to see your labels.`})));
+        return message.reply(opts(responseBuilder.buildResult({ description: `No saved UPI under label \`${parsed.label}\`. Run \`${prefix}listupi\` to see your labels.`})));
       }
       return sendQrEmbed(message, found.upiId, message.author.username, parsed.amount, parsed.note, parsed.isFlexible);
     }
@@ -482,12 +484,12 @@ module.exports = {
       const rows = await getDb().upi.list(message.author.id);
       const found = rows.find((r) => r.label.toLowerCase() === parsed.label.toLowerCase());
       if (!found) {
-        return message.reply(opts(responseBuilder.buildResult({ description: `No saved UPI under label \`${parsed.label}\`. Run \`${config.prefix}listupi\` to see your labels.`})));
+        return message.reply(opts(responseBuilder.buildResult({ description: `No saved UPI under label \`${parsed.label}\`. Run \`${prefix}listupi\` to see your labels.`})));
       }
       return askAmountAndGenerate(message, await message.reply(opts(responseBuilder.buildResult({ description: `UPI ID: \`${found.upiId}\` (label: \`${parsed.label}\`)\nNow let\'s set the amount...`})), { fetchReply: true }), found.upiId, message.author.username);
     }
 
     // Fallback: invalid format
-    return message.reply(opts(USAGE_EMBED(config.prefix)));
+    return message.reply(opts(USAGE_EMBED(prefix)));
   },
 };

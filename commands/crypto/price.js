@@ -5,6 +5,7 @@ const responseBuilder = require('../../utils/responseBuilder');
 const config = require('../../utils/config');
 const { opts } = require('../../utils/v2Reply');
 const { getPrice, searchCoin } = require('../../utils/cryptoApi');
+const { getPrefix } = require('../../utils/prefixCache');
 
 const ALIAS = { btc: 'bitcoin', eth: 'ethereum', usdt: 'tether', usdc: 'usd-coin', sol: 'solana', matic: 'matic-network', ada: 'cardano', xrp: 'ripple', doge: 'dogecoin', ltc: 'litecoin', trx: 'tron', bnb: 'binancecoin', ton: 'the-open-network', shib: 'shiba-inu', pepe: 'pepe', wif: 'dogwifcoin', sui: 'sui', apt: 'aptos', arb: 'arbitrum', op: 'optimism', avax: 'avalanche-2', link: 'chainlink', uni: 'uniswap', aave: 'aave', dot: 'polkadot', atom: 'cosmos', near: 'near', ftm: 'fantom', mkr: 'maker', snx: 'havven', comp: 'compound-governance-token', crv: 'curve-dao-token', ldo: 'lido-dao', rpl: 'rocket-pool', fdusd: 'first-digital-usd' };
 
@@ -26,11 +27,12 @@ module.exports = {
     },
   ],
   async execute(message, args, client) {
+    const prefix = await getPrefix(message.guild?.id);
     const q = (args.join(' ') || '').toLowerCase().trim();
-    if (!q) return message.reply(opts(responseBuilder.buildResult({ description: `Usage: \`${config.prefix}price <coin>\``})));
+    if (!q) return message.reply(opts(responseBuilder.buildResult({ description: `Usage: \`${prefix}price <coin>\``})));
 
     const m = await message.reply(opts(responseBuilder.buildResult({ description: '⏳ Fetching price…'})));
-    const embed = await renderPriceEmbed(q, config.prefix);
+    const embed = await renderPriceEmbed(q, prefix);
     return m.edit(opts(embed));
   },
   async slashExecute(interaction) {
