@@ -1,27 +1,14 @@
 const responseBuilder = require('../../utils/responseBuilder');
 // src/commands/crypto/bal.js
-// ?bal <address> — Multi-chain wallet balance lookup.
+// ?bal [network] <address> — Multi-chain wallet balance lookup.
 //
-// Chain detection:
-//   • EVM (0x + 40 hex) → ambiguous: Polygon / BNB / Ethereum.
-//       Show "Which Chain?" embed + StringSelectMenu; on selection, fetch the
-//       matching chain's native coin balance + USDT (Polygon-ERC20 / BEP20) balance.
-//   • Tron (T-prefixed base58) → TronGrid — TRX + TRC20 USDT balance.
-//   • Litecoin (L/M/3/ltc1) → BlockCypher LTC balance (confirmed / unconfirmed / total).
-//   • Solana (base58, 32-44 chars) → Helius RPC SOL balance.
-//   • Unknown format → clear error, no API call.
-//
-// Embed format:
-//   Title: "<Chain> Wallet Balance"
-//   Balances:
-//   > Confirmed: <amount> <NATIVE> ($<usd>)
-//   > Unconfirmed: <amount> <NATIVE> ($<usd>)
-//   > Total: <amount> <NATIVE> ($<usd>)
-//   > USDT: <amount> USDT ($<usd>)     ← only when balance > 0
-//   Address:
-//   > <full address>
-//   Footer: "Developed by Pixel Exchange • <timestamp>"
-//   Button: "View Address 🔗"
+// Supports:
+//   • EVM Chains (Polygon, BNB Chain, Ethereum, Arbitrum, Base, Optimism)
+//   • Bitcoin (BTC) — Bech32 (bc1), Legacy (1), P2SH (3)
+//   • Dogecoin (DOGE) — (D, A, 9)
+//   • Litecoin (LTC) — (L, M, 3, ltc1)
+//   • Tron (TRX) — TRX + TRC-20 tokens (USDT, USDC, etc.)
+//   • Solana (SOL) — SOL + SPL tokens (USDT, USDC, etc.)
 
 const {
   ActionRowBuilder,
@@ -37,23 +24,28 @@ const {
   tronFetchBalance,
   solanaFetchBalance,
   litecoinFetchBalance,
+  bitcoinFetchBalance,
+  dogecoinFetchBalance,
   getUsdPrice,
 } = require('../../utils/cryptoApi');
+const { normalizeNetworkName } = require('../../utils/crypto/networkDetector');
 
-const PURPLE = 0x5865F2, GREEN = 0x57F287, RED = 0xED4245, YELLOW = 0xFEE75C;
-
-// messageId -> { address, kind: 'bal' }
+// messageId -> { address, kind: 'bal', invokerId, at }
 const state = new Map();
 
 const EVM_OPTIONS = [
-  { value: 'polygon',  label: 'Polygon',     emoji: '🟣' },
-  { value: 'bnb',      label: 'BNB Chain',   emoji: '🟡' },
-  { value: 'ethereum', label: 'Ethereum',   emoji: '🔷' },
+  { value: 'polygon',  label: 'Polygon',      emoji: '🟣', description: 'Polygon PoS (POL / MATIC)' },
+  { value: 'bnb',      label: 'BNB Chain',    emoji: '🟡', description: 'BNB Smart Chain (BNB)' },
+  { value: 'ethereum', label: 'Ethereum',     emoji: '🔷', description: 'Ethereum Mainnet (ETH)' },
+  { value: 'arbitrum', label: 'Arbitrum One', emoji: '🔵', description: 'Arbitrum Layer 2 (ETH)' },
+  { value: 'base',     label: 'Base',         emoji: '🟦', description: 'Base Layer 2 (ETH)' },
+  { value: 'optimism', label: 'Optimism',     emoji: '🔴', description: 'Optimism Mainnet (ETH)' },
 ];
 
-function footerNow() {
-  return { text: `Developed by Pixel Exchange • ${new Date().toLocaleString()}` };
-}
+const UTXO_P2SH_OPTIONS = [
+  { value: 'bitcoin',  label: 'Bitcoin',  emoji: '🪙', description: 'Bitcoin Mainnet (BTC)' },
+  { value: 'litecoin', label: 'Litecoin', emoji: '⚪', description: 'Litecoin Mainnet (LTC)' },
+];
 
 function shortAddr(addr) {
   if (!addr) return '—';
@@ -67,26 +59,37 @@ function fmt(n, decimals = 6) {
   return n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: decimals });
 }
 
-function buildNetworkSelect() {
+function buildEvmSelectRow() {
   return new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId('bal_network_select')
-      .setPlaceholder('Select the Network...')
-      .addOptions(EVM_OPTIONS.map((o) => ({ label: o.label, value: o.value, emoji: o.emoji })))
+      .setPlaceholder('Select EVM Network...')
+      .addOptions(EVM_OPTIONS.map((o) => ({ label: o.label, value: o.value, emoji: o.emoji, description: o.description })))
   );
 }
 
-function buildAmbiguousEmbed(address) {
-  return responseBuilder.buildResult({ title: 'Which Chain?', description: `> Address: \`${shortAddr(address)}\`\n` +
-      `> This address matches multiple EVM chains.\n` +
-      `> Select the correct network below.`});
+function buildUtxoSelectRow() {
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId('bal_network_select')
+      .setPlaceholder('Select Network (Bitcoin / Litecoin)...')
+      .addOptions(UTXO_P2SH_OPTIONS.map((o) => ({ label: o.label, value: o.value, emoji: o.emoji, description: o.description })))
+  );
 }
 
-function buildBalanceEmbed(b) {
+function buildAmbiguousEmbed(address, type = 'EVM') {
+  return responseBuilder.buildResult({
+    title: `Which Chain? (${type})`,
+    description: `> Address: \`${shortAddr(address)}\`\n` +
+      `> This address matches multiple networks.\n` +
+      `> Select the correct network below to look up the balance.`,
+  });
+}
+
+async function buildBalanceEmbed(b) {
   const lines = [];
   lines.push(`Balances:`);
-  // Solana & Tron & EVM chains don't distinguish confirmed/unconfirmed in our data,
-  // but Litecoin does. We render uniformly: when unconfirmed is null/0, show 0.
+
   const confirmed = b.nativeBalance ?? 0;
   const unconfirmed = b.nativeUnconfirmed ?? 0;
   const total = b.nativeTotal ?? confirmed;
@@ -98,13 +101,30 @@ function buildBalanceEmbed(b) {
   const priceUnavailable = (usd == null && b.nativeCoinId);
 
   lines.push(`> Confirmed: **${fmt(confirmed, 8)} ${b.nativeSymbol}**${usdConfirmed != null ? ` ($${fmt(usdConfirmed, 2)})` : ''}`);
-  lines.push(`> Unconfirmed: **${fmt(unconfirmed, 8)} ${b.nativeSymbol}**${usdUnconfirmed != null ? ` ($${fmt(usdUnconfirmed, 2)})` : ''}`);
-  lines.push(`> Total: **${fmt(total, 8)} ${b.nativeSymbol}**${usdTotal != null ? ` ($${fmt(usdTotal, 2)})` : ''}`);
+  if (unconfirmed !== 0 || b.chainKey === 'litecoin' || b.chainKey === 'bitcoin' || b.chainKey === 'dogecoin') {
+    lines.push(`> Unconfirmed: **${fmt(unconfirmed, 8)} ${b.nativeSymbol}**${usdUnconfirmed != null ? ` ($${fmt(usdUnconfirmed, 2)})` : ''}`);
+    lines.push(`> Total: **${fmt(total, 8)} ${b.nativeSymbol}**${usdTotal != null ? ` ($${fmt(usdTotal, 2)})` : ''}`);
+  }
 
-  if (b.usdtBalance && b.usdtBalance > 0) {
-    const usdtUsd = b.usdtUsd ?? 1; // USDT is approximately $1
-    const usdtUsdVal = (usdtUsd != null && Number.isFinite(usdtUsd)) ? usdtUsd : 1;
-    lines.push(`> USDT: **${fmt(b.usdtBalance, 6)} USDT** ($${fmt(b.usdtBalance * usdtUsdVal, 2)})`);
+  // Render Token Balances (USDT, USDC, DAI, etc.)
+  if (Array.isArray(b.tokenBalances) && b.tokenBalances.length > 0) {
+    for (const t of b.tokenBalances) {
+      if (t.balance > 0) {
+        let tUsd = t.usdValue;
+        if (tUsd == null && t.coinId) {
+          try {
+            const p = await getUsdPrice(t.coinId);
+            if (p) tUsd = t.balance * p;
+          } catch {}
+        } else if (tUsd == null && (t.symbol === 'USDT' || t.symbol === 'USDC' || t.symbol === 'DAI')) {
+          tUsd = t.balance; // Stablecoins peg at ~1 USD
+        }
+        lines.push(`> ${t.symbol}: **${fmt(t.balance, 6)} ${t.symbol}**${tUsd != null ? ` ($${fmt(tUsd, 2)})` : ''}`);
+      }
+    }
+  } else if (b.usdtBalance && b.usdtBalance > 0) {
+    const usdtUsd = b.usdtUsd ?? 1;
+    lines.push(`> USDT: **${fmt(b.usdtBalance, 6)} USDT** ($${fmt(b.usdtBalance * usdtUsd, 2)})`);
   }
 
   if (priceUnavailable) {
@@ -114,7 +134,7 @@ function buildBalanceEmbed(b) {
   lines.push(`Address:`);
   lines.push(`> \`${b.address}\``);
 
-  const e = responseBuilder.buildResult({ title: `${b.chain} Wallet Balance`, description: lines.join('\n')});
+  const e = responseBuilder.buildResult({ title: `${b.chain} Wallet Balance`, description: lines.join('\n') });
 
   if (b.explorerAddrUrl) {
     const row = new ActionRowBuilder().addComponents(
@@ -133,106 +153,198 @@ module.exports = {
   name: 'bal',
   aliases: ['balance', 'b'],
   category: 'crypto',
-  description: 'Check wallet balance across Polygon, BNB, ETH, LTC, SOL, TRC20.',
-  usage: '<address>',
-  cooldown: 5,
+  description: 'Check wallet balance across Bitcoin, Dogecoin, Litecoin, Solana, Tron, Polygon, BNB Chain, Ethereum, Arbitrum, Base, Optimism.',
+  usage: '[network] <address>',
+  cooldown: 3,
   args: true,
+
   async execute(message, args, client) {
-    const address = String(args[0] || '').trim();
-    if (!address) {
-      return message.reply(opts(responseBuilder.buildResult({ description: `Usage: \`${config.prefix}bal <address>\``})));
+    const tokens = (args || []).map((a) => String(a).trim()).filter(Boolean);
+    if (!tokens.length) {
+      return message.reply(opts(responseBuilder.buildResult({ description: `Usage: \`${config.prefix}bal [network] <address>\`` })));
     }
 
+    let explicitNetwork = null;
+    let address = '';
+
+    const net0 = normalizeNetworkName(tokens[0]);
+    if (net0 && tokens[1]) {
+      explicitNetwork = net0;
+      address = tokens[1];
+    } else {
+      const net1 = tokens[1] ? normalizeNetworkName(tokens[1]) : null;
+      if (net1) {
+        explicitNetwork = net1;
+        address = tokens[0];
+      } else {
+        address = tokens[0];
+      }
+    }
+
+    // 1. Explicit Network Provided
+    if (explicitNetwork) {
+      const netLabel = explicitNetwork.toUpperCase();
+      const statusMsg = await message.reply(
+        opts(responseBuilder.buildResult({ description: `⏳ Fetching **${netLabel}** balance for \`${shortAddr(address)}\`…` }))
+      );
+
+      try {
+        let bal = null;
+        if (['polygon', 'bnb', 'ethereum', 'arbitrum', 'base', 'optimism'].includes(explicitNetwork)) {
+          bal = await evmFetchBalance(explicitNetwork, address);
+        } else if (explicitNetwork === 'bitcoin') {
+          bal = await bitcoinFetchBalance(address);
+        } else if (explicitNetwork === 'dogecoin') {
+          bal = await dogecoinFetchBalance(address);
+        } else if (explicitNetwork === 'litecoin') {
+          bal = await litecoinFetchBalance(address);
+        } else if (explicitNetwork === 'tron') {
+          bal = await tronFetchBalance(address);
+        } else if (explicitNetwork === 'solana') {
+          bal = await solanaFetchBalance(address);
+        } else {
+          throw new Error(`Unsupported network: ${explicitNetwork}`);
+        }
+
+        if (bal.nativeCoinId) {
+          try { bal.usdPerNative = await getUsdPrice(bal.nativeCoinId); } catch { bal.usdPerNative = null; }
+        }
+
+        const embedData = await buildBalanceEmbed(bal);
+        return statusMsg.edit(embedData);
+      } catch (err) {
+        return statusMsg.edit(
+          opts(responseBuilder.buildResult({ title: 'Balance Lookup Failed', description: `Failed to fetch balance on **${netLabel}**:\n${err.message}` }))
+        );
+      }
+    }
+
+    // 2. Automatic Detection
     const detected = detectAddressChain(address);
 
     if (detected.type === 'unknown') {
-      return message.reply(opts(responseBuilder.buildResult({ title: 'Invalid Address', description: 'Invalid or unrecognized wallet address format.\nSupported: EVM (`0x…` 42 chars), Tron (`T…`), Litecoin (`L…`/`M…`/`3…`/`ltc1…`), Solana (base58 32-44 chars).'})));
+      return message.reply(
+        opts(responseBuilder.buildResult({
+          title: 'Invalid Address Format',
+          description: 'Unrecognized wallet address format.\n\n' +
+            '**Supported Formats:**\n' +
+            '• **EVM:** `0x...` (Polygon, BNB, ETH, Arbitrum, Base, Optimism)\n' +
+            '• **Bitcoin:** `bc1...` (Bech32), `1...` (Legacy), `3...` (P2SH)\n' +
+            '• **Dogecoin:** `D...`, `A...`, `9...`\n' +
+            '• **Litecoin:** `L...`, `M...`, `ltc1...`\n' +
+            '• **Tron:** `T...` (TRX & TRC-20 tokens)\n' +
+            '• **Solana:** Base58 (SOL & SPL tokens)\n\n' +
+            `You can also specify the network directly: \`${config.prefix}bal <network> <address>\``,
+        }))
+      );
     }
 
-    // ── EVM-ambiguous: show the network select menu ──
+    // EVM: Ambiguous across EVM chains -> show dropdown
     if (detected.type === 'evm') {
-      const embed = buildAmbiguousEmbed(address);
-      const row = buildNetworkSelect();
+      const embed = buildAmbiguousEmbed(address, 'EVM Chains');
+      const row = buildEvmSelectRow();
       embed.addActionRowComponents(row);
       const sent = await message.reply(opts(embed));
-      state.set(sent.id, { address, kind: 'bal', at: Date.now(), invokerId: message.author.id });
+      state.set(sent.id, { address, invokerId: message.author.id, at: Date.now() });
       setTimeout(() => state.delete(sent.id), 5 * 60_000).unref?.();
       return;
     }
 
-    // ── Direct lookups for non-ambiguous chains ──
-    const m = await message.reply(opts(responseBuilder.buildResult({ description: `⏳ Fetching ${detected.type === 'tron' ? 'Tron' : detected.type === 'litecoin' ? 'Litecoin' : 'Solana'} balance…`})));
+    // UTXO P2SH: Ambiguous between Bitcoin and Litecoin -> show dropdown
+    if (detected.type === 'utxo_p2sh') {
+      const embed = buildAmbiguousEmbed(address, 'Bitcoin / Litecoin');
+      const row = buildUtxoSelectRow();
+      embed.addActionRowComponents(row);
+      const sent = await message.reply(opts(embed));
+      state.set(sent.id, { address, invokerId: message.author.id, at: Date.now() });
+      setTimeout(() => state.delete(sent.id), 5 * 60_000).unref?.();
+      return;
+    }
+
+    // Direct lookups for deterministic non-ambiguous formats
+    const networkName = detected.type.charAt(0).toUpperCase() + detected.type.slice(1);
+    const statusMsg = await message.reply(
+      opts(responseBuilder.buildResult({ description: `⏳ Fetching **${networkName}** balance for \`${shortAddr(address)}\`…` }))
+    );
 
     try {
       let bal;
-      if (detected.type === 'tron') bal = await tronFetchBalance(address);
+      if (detected.type === 'bitcoin') bal = await bitcoinFetchBalance(address);
+      else if (detected.type === 'dogecoin') bal = await dogecoinFetchBalance(address);
       else if (detected.type === 'litecoin') bal = await litecoinFetchBalance(address);
+      else if (detected.type === 'tron') bal = await tronFetchBalance(address);
       else if (detected.type === 'solana') bal = await solanaFetchBalance(address);
       else throw new Error('Unsupported address type.');
 
-      // Attach live USD price for native coin (best-effort, never throws).
-      const coinId = bal.nativeCoinId;
-      if (coinId) {
-        try { bal.usdPerNative = await getUsdPrice(coinId); } catch { bal.usdPerNative = null; }
+      if (bal.nativeCoinId) {
+        try { bal.usdPerNative = await getUsdPrice(bal.nativeCoinId); } catch { bal.usdPerNative = null; }
       }
-      // USDT is approximately $1 — use CoinGecko's tether price for accuracy.
-      if (bal.usdtBalance > 0) {
-        try { bal.usdtUsd = await getUsdPrice('tether'); } catch { bal.usdtUsd = 1; }
-      }
-      return m.edit(buildBalanceEmbed(bal));
+
+      const embedData = await buildBalanceEmbed(bal);
+      return statusMsg.edit(embedData);
     } catch (e) {
-      return m.edit(opts(responseBuilder.buildResult({ description: `Balance lookup failed: **${e.message}**`})));
+      return statusMsg.edit(
+        opts(responseBuilder.buildResult({ title: 'Balance Lookup Failed', description: `Balance lookup failed: **${e.message}**` }))
+      );
     }
   },
 
-  // Called from interactionCreate when the user picks a network.
+  // Called from interactionCreate when user picks network from dropdown
   async handleInteraction(interaction, _client) {
     try {
       if (!interaction.isStringSelectMenu() || interaction.customId !== 'bal_network_select') return;
       const st = state.get(interaction.message.id);
       if (!st) {
-        return interaction.update(opts(responseBuilder.buildResult({ description: 'This lookup has expired. Run `?bal <address>` again.'})));
+        return interaction.update(opts(responseBuilder.buildResult({ description: 'This lookup has expired. Run `?bal <address>` again.' })));
       }
-      // Only the original invoker can pick the network — prevents other users in
-      // the channel from triggering API calls on the invoker's behalf.
+
       if (interaction.user.id !== st.invokerId) {
         return interaction.reply(opts(buildContainer({ description: 'Only the user who ran `?bal` can pick the network.', color: '#FEE75C' }), { ephemeral: true }));
       }
-      const chainKey = interaction.values[0];
-      const opt = EVM_OPTIONS.find((o) => o.value === chainKey);
-      if (!opt) return interaction.deferUpdate?.().catch(() => {});
 
-      // Edit to "Fetching <Chain> balance..."
+      const chainKey = interaction.values[0];
+      const allOptions = [...EVM_OPTIONS, ...UTXO_P2SH_OPTIONS];
+      const opt = allOptions.find((o) => o.value === chainKey) || { label: chainKey };
+
       await interaction.update(
-        opts(responseBuilder.buildResult({ description: `Fetching ${opt.label} balance…`}))
+        opts(responseBuilder.buildResult({ description: `⏳ Fetching **${opt.label}** balance…` }))
       );
 
       try {
-        const bal = await evmFetchBalance(chainKey, st.address);
-        const coinId = bal.nativeCoinId;
-        if (coinId) {
-          try { bal.usdPerNative = await getUsdPrice(coinId); } catch { bal.usdPerNative = null; }
+        let bal;
+        if (['polygon', 'bnb', 'ethereum', 'arbitrum', 'base', 'optimism'].includes(chainKey)) {
+          bal = await evmFetchBalance(chainKey, st.address);
+        } else if (chainKey === 'bitcoin') {
+          bal = await bitcoinFetchBalance(st.address);
+        } else if (chainKey === 'litecoin') {
+          bal = await litecoinFetchBalance(st.address);
+        } else if (chainKey === 'dogecoin') {
+          bal = await dogecoinFetchBalance(st.address);
+        } else if (chainKey === 'tron') {
+          bal = await tronFetchBalance(st.address);
+        } else if (chainKey === 'solana') {
+          bal = await solanaFetchBalance(st.address);
         }
-        if (bal.usdtBalance > 0) {
-          try { bal.usdtUsd = await getUsdPrice('tether'); } catch { bal.usdtUsd = 1; }
+
+        if (bal.nativeCoinId) {
+          try { bal.usdPerNative = await getUsdPrice(bal.nativeCoinId); } catch { bal.usdPerNative = null; }
         }
-        await interaction.message.edit(buildBalanceEmbed(bal));
+
+        const embedData = await buildBalanceEmbed(bal);
+        await interaction.message.edit(embedData);
       } catch (e) {
-        await interaction.message.edit(opts(responseBuilder.buildResult({ description: `${opt.label} balance lookup failed: **${e.message}**`}))).catch(() => {});
+        await interaction.message.edit(
+          opts(responseBuilder.buildResult({ title: 'Balance Lookup Failed', description: `${opt.label} balance lookup failed: **${e.message}**` }))
+        ).catch(() => {});
       } finally {
         state.delete(interaction.message.id);
       }
     } catch (e) {
-      try {
-        if (!interaction.replied && !interaction.deferred) {
-          await interaction.reply(opts(buildContainer({ description: 'Balance lookup error: ' + (e?.message || 'unknown'), color: '#ED4245' }), { ephemeral: true })).catch(() => {});
-        }
-      } catch { /* ignore */ }
+      console.error('[bal] handleInteraction exception:', e);
     }
   },
 };
 
-// Allow interactionCreate to call this module as a function (for routing parity with help).
 module.exports.default = async function (interaction, client) {
   return module.exports.handleInteraction(interaction, client);
 };

@@ -3,7 +3,7 @@
 // Architecture:
 // parseTransaction(network, txIdentifier, options)
 //        ↓
-// network-specific parser (EVM, Litecoin, Solana, Tron)
+// network-specific parser (EVM, Litecoin, Bitcoin, Dogecoin, Solana, Tron)
 //        ↓
 // normalized Transaction object
 //        ↓
@@ -23,6 +23,8 @@ const {
 } = require('./networkDetector');
 const { EVMTransactionParser, EVM_CHAINS } = require('./parsers/evmParser');
 const { LitecoinTransactionParser } = require('./parsers/litecoinParser');
+const { BitcoinTransactionParser } = require('./parsers/bitcoinParser');
+const { DogecoinTransactionParser } = require('./parsers/dogecoinParser');
 const { SolanaTransactionParser } = require('./parsers/solanaParser');
 const { TronTransactionParser } = require('./parsers/tronParser');
 const { enrichTransactionWithPrices, getUsdPrice } = require('./priceService');
@@ -37,6 +39,8 @@ function getEvmParser(chainKey) {
 }
 
 const ltcParser = new LitecoinTransactionParser();
+const btcParser = new BitcoinTransactionParser();
+const dogeParser = new DogecoinTransactionParser();
 const solParser = new SolanaTransactionParser();
 const tronParser = new TronTransactionParser();
 
@@ -59,6 +63,10 @@ async function parseTransaction(networkKey, txIdentifier, options = {}) {
       tx = await parser.parse(identifier, options);
     } else if (normNet === 'litecoin') {
       tx = await ltcParser.parse(identifier, options);
+    } else if (normNet === 'bitcoin') {
+      tx = await btcParser.parse(identifier, options);
+    } else if (normNet === 'dogecoin') {
+      tx = await dogeParser.parse(identifier, options);
     } else if (normNet === 'solana') {
       tx = await solParser.parse(identifier, options);
     } else if (normNet === 'tron') {
@@ -72,11 +80,12 @@ async function parseTransaction(networkKey, txIdentifier, options = {}) {
     if (detected.type === 'solana') {
       tx = await solParser.parse(identifier, options);
     } else if (detected.type === 'hex64') {
-      // 64-char hex: Try Tron first if configured, else Litecoin
-      tx = await tronParser.parse(identifier, options);
-      if (!tx) {
-        tx = await ltcParser.parse(identifier, options);
-      }
+      // 64-char hex: Ambiguous across Bitcoin, Litecoin, Dogecoin, Tron
+      // Try sequentially with quick fallbacks
+      tx = await tronParser.parse(identifier, options).catch(() => null);
+      if (!tx) tx = await ltcParser.parse(identifier, options).catch(() => null);
+      if (!tx) tx = await btcParser.parse(identifier, options).catch(() => null);
+      if (!tx) tx = await dogeParser.parse(identifier, options).catch(() => null);
     } else if (detected.type === 'evm') {
       // Ambiguous EVM: caller should display network selector or specify chain
       return { ambiguous: true, candidates: detected.candidates, hash: identifier };
@@ -102,6 +111,8 @@ module.exports = {
   parseTransaction,
   getEvmParser,
   ltcParser,
+  btcParser,
+  dogeParser,
   solParser,
   tronParser,
   // Sub-modules

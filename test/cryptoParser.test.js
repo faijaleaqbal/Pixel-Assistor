@@ -46,11 +46,14 @@ describe('Deterministic Network Detection', () => {
     });
   });
 
-  it('Priority B: Address format detection (Legacy, SegWit, EVM, Solana, Tron)', () => {
+  it('Priority B: Address format detection (Legacy, SegWit, EVM, Solana, Tron, BTC, DOGE)', () => {
     assert.equal(detectAddressNetwork('0x71C7656EC7ab88b098defB751B7401B5f6d8976F').type, 'evm');
     assert.equal(detectAddressNetwork('LgN8Q9g2Z5Yg4M3k7R2s1T9u8v7w6x5y4z').type, 'litecoin');
     assert.equal(detectAddressNetwork('MNyPq2K4aW4B9jXyZ3v5U7t9r1q3p5o7i9').type, 'litecoin');
     assert.equal(detectAddressNetwork('ltc1qg6hyv6z4m0c9y5t8r3e2w1q0p9o8i7u6y5t4r3').type, 'litecoin');
+    assert.equal(detectAddressNetwork('bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq').type, 'bitcoin');
+    assert.equal(detectAddressNetwork('1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa').type, 'bitcoin');
+    assert.equal(detectAddressNetwork('DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L').type, 'dogecoin');
     assert.equal(detectAddressNetwork('TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t').type, 'tron');
     assert.equal(detectAddressNetwork('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v').type, 'solana');
   });

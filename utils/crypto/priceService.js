@@ -21,6 +21,7 @@ const SYMBOL_TO_COINGECKO_ID = {
   sol: 'solana',
   wsol: 'solana',
   ltc: 'litecoin',
+  doge: 'dogecoin',
   trx: 'tron',
   usdt: 'tether',
   usdc: 'usd-coin',
@@ -31,6 +32,18 @@ const SYMBOL_TO_COINGECKO_ID = {
   arb: 'arbitrum',
   op: 'optimism',
   ray: 'raydium',
+  shib: 'shiba-inu',
+  pepe: 'pepe',
+  bonk: 'bonk',
+  jup: 'jupiter-exchange-solana',
+  wif: 'dogwifcoin',
+  btt: 'bittorrent',
+  win: 'wink',
+  sun: 'sun-token',
+  jst: 'just',
+  link: 'chainlink',
+  uni: 'uniswap',
+  aave: 'aave',
 };
 
 const priceCache = new Map(); // coinId -> { usd: number | null, expires: number }

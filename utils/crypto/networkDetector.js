@@ -30,6 +30,8 @@ const NETWORK_ALIASES = {
   tron: 'tron',
   btc: 'bitcoin',
   bitcoin: 'bitcoin',
+  doge: 'dogecoin',
+  dogecoin: 'dogecoin',
 };
 
 const NETWORK_METADATA = {
@@ -43,6 +45,7 @@ const NETWORK_METADATA = {
   solana: { key: 'solana', label: 'Solana', type: 'solana', coinId: 'solana', symbol: 'SOL' },
   tron: { key: 'tron', label: 'Tron', type: 'tron', coinId: 'tron', symbol: 'TRX' },
   bitcoin: { key: 'bitcoin', label: 'Bitcoin', type: 'utxo', coinId: 'bitcoin', symbol: 'BTC' },
+  dogecoin: { key: 'dogecoin', label: 'Dogecoin', type: 'utxo', coinId: 'dogecoin', symbol: 'DOGE' },
 };
 
 // Regex patterns
@@ -63,6 +66,9 @@ const TRON_ADDR_RE = /^T[1-9A-HJ-NP-Za-km-z]{33}$/;
 // Bitcoin addresses
 const BTC_BECH32_RE = /^bc1[a-z0-9]{8,87}$/i;
 const BTC_LEGACY_RE = /^1[a-km-zA-HJ-NP-Z1-9]{25,34}$/;
+
+// Dogecoin addresses (starts with D, A, or 9; standard 34 chars)
+const DOGE_ADDR_RE = /^D{1}[5-9A-HJ-NP-U]{1}[1-9A-HJ-NP-Za-km-z]{32}$|^[A9]{1}[1-9A-HJ-NP-Za-km-z]{33}$/;
 
 /**
  * Resolves user-provided network string to canonical network key.
@@ -92,6 +98,10 @@ function detectAddressNetwork(addr) {
     return { type: 'tron', candidates: ['tron'] };
   }
 
+  if (DOGE_ADDR_RE.test(a)) {
+    return { type: 'dogecoin', candidates: ['dogecoin'] };
+  }
+
   if (LTC_BECH32_RE.test(a) || LTC_LEGACY_RE.test(a) || LTC_M_P2SH_RE.test(a)) {
     return { type: 'litecoin', candidates: ['litecoin'] };
   }
@@ -102,7 +112,7 @@ function detectAddressNetwork(addr) {
 
   // "3..." addresses are used by both Litecoin and Bitcoin P2SH
   if (P2SH_3_RE.test(a)) {
-    return { type: 'utxo_p2sh', ambiguous: true, candidates: ['litecoin', 'bitcoin'] };
+    return { type: 'utxo_p2sh', ambiguous: true, candidates: ['bitcoin', 'litecoin'] };
   }
 
   // Solana public key is base58, 32-44 characters
@@ -140,12 +150,12 @@ function detectTxFormat(txIdentifier) {
   }
 
   // 3. 64-character Hexadecimal string (without 0x prefix):
-  // Belong to UTXO chains (Litecoin, Bitcoin) or Tron. NEVER Solana.
+  // Belong to UTXO chains (Bitcoin, Litecoin, Dogecoin) or Tron. NEVER Solana.
   if (HEX64_RE.test(s)) {
     return {
       type: 'hex64',
       ambiguous: true,
-      candidates: ['litecoin', 'tron', 'bitcoin'],
+      candidates: ['bitcoin', 'litecoin', 'dogecoin', 'tron'],
     };
   }
 
