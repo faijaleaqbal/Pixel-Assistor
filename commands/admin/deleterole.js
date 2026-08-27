@@ -1,7 +1,6 @@
-// src/commands/admin/deleterole.js
 const responseBuilder = require('../../utils/responseBuilder');
 const { opts } = require('../../utils/v2Reply');
-const { canManageRole } = require('../../utils/perms');
+const { canManageRole, isTrustedOwner } = require('../../utils/perms');
 
 module.exports = {
   name: 'deleterole',
@@ -10,9 +9,19 @@ module.exports = {
   description: 'Delete a role by name, mention, or ID.',
   usage: '<role>',
   cooldown: 5,
+  ownerOnly: true,
   permissions: ['ManageRoles'],
   args: true,
   async execute(message, args, client) {
+    const isAuthorized = await isTrustedOwner(message.author.id, message.guild);
+    if (!isAuthorized) {
+      return message.reply(
+        opts(responseBuilder.buildResult({
+          title: 'Access Denied',
+          description: "❌ You don't have permission to use this command. This command is restricted to Server Owners & Trusted Owners.",
+        }))
+      );
+    }
     const input = args.join(' ');
     if (!input) return message.reply(opts(responseBuilder.buildResult({ description: 'Provide a role name, mention, or ID.'})));
 

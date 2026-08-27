@@ -4,6 +4,7 @@
 const responseBuilder = require('../../utils/responseBuilder');
 const { opts, buildContainer } = require('../../utils/v2Reply');
 const { getDb } = require('../../utils/db');
+const { isTrustedOwner } = require('../../utils/perms');
 
 function parseRoles(raw) {
   if (Array.isArray(raw)) return raw;
@@ -16,8 +17,19 @@ module.exports = {
   description: 'Manage admin roles. Usage: admin add <@role> | remove <@role> | reset | role | show',
   usage: 'add <@role> | remove <@role> | reset | role | show',
   cooldown: 3,
+  ownerOnly: true,
   permissions: ['Administrator'],
   async execute(message, args, client) {
+    const isAuthorized = await isTrustedOwner(message.author.id, message.guild);
+    if (!isAuthorized) {
+      return message.reply(
+        opts(responseBuilder.buildResult({
+          title: 'Access Denied',
+          description: "❌ You don't have permission to use this command. This command is restricted to Server Owners & Trusted Owners.",
+        }))
+      );
+    }
+
     const db = getDb();
     const action = args[0]?.toLowerCase();
     const guildId = message.guild.id;

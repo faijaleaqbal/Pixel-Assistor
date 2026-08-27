@@ -29,6 +29,7 @@ describe('Export Command Suite', () => {
     guild: {
       id: 'guild_123',
       name: 'Pixel Server',
+      ownerId: 'user_123',
     },
     author: {
       id: 'user_123',

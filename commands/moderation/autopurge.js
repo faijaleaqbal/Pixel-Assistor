@@ -6,6 +6,7 @@ const { PermissionsBitField } = require('discord.js');
 const responseBuilder = require('../../utils/responseBuilder');
 const { opts } = require('../../utils/v2Reply');
 const { getPrefix } = require('../../utils/prefixCache');
+const { isTrustedOwner } = require('../../utils/perms');
 const logger = require('../../utils/logger');
 
 // channelId -> { id: intervalId, maxAge: number, interval: number, guildId: string, startedAt: number }
@@ -30,12 +31,23 @@ module.exports = {
   description: 'Auto-purge messages older than N seconds every M seconds.',
   usage: '<on <maxAge> [interval]|off|status>',
   cooldown: 5,
+  ownerOnly: true,
   permissions: ['ManageMessages', 'ManageGuild'],
   args: false,
   loops,
   stopLoop,
 
   async execute(message, args, client) {
+    const isAuthorized = await isTrustedOwner(message.author.id, message.guild);
+    if (!isAuthorized) {
+      return message.reply(
+        opts(responseBuilder.buildResult({
+          title: 'Access Denied',
+          description: "❌ You don't have permission to use this command. This command is restricted to Server Owners & Trusted Owners.",
+        }))
+      );
+    }
+
     const prefix = await getPrefix(message.guild?.id);
     const mode = (args[0] || '').toLowerCase();
     const channelId = message.channelId;

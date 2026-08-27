@@ -8,6 +8,8 @@ const {
   hasPermission,
   isOwner,
   isGuildOwner,
+  isTrustedOwner,
+  getTrustedOwners,
 } = require('../utils/perms');
 
 describe('Permission & Role Hierarchy Validation Engine', () => {
@@ -168,12 +170,21 @@ describe('Permission & Role Hierarchy Validation Engine', () => {
     assert.ok(check2.missing.includes('SendMessages'));
   });
 
-  it('isOwner & isGuildOwner accurately identify ownership', () => {
+  it('isOwner & isGuildOwner accurately identify ownership', async () => {
     assert.equal(isGuildOwner({ id: 'owner_user_id' }, guild), true);
     assert.equal(isGuildOwner({ id: 'random_user_id' }, guild), false);
     assert.equal(isOwner('some_random_id'), false);
 
     const adminMember = { permissions: { has: () => true } };
     assert.equal(hasPermission(adminMember, 'Administrator'), true);
+
+    const trustedOwner = await isTrustedOwner('owner_user_id', guild);
+    assert.equal(trustedOwner, true);
+
+    const untrusted = await isTrustedOwner('random_user_id', guild);
+    assert.equal(untrusted, false);
+
+    const ownersInfo = await getTrustedOwners(guild);
+    assert.equal(ownersInfo.guildOwnerId, 'owner_user_id');
   });
 });

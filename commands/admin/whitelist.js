@@ -12,15 +12,11 @@
 const responseBuilder = require('../../utils/responseBuilder');
 const { opts } = require('../../utils/v2Reply');
 const { getDb } = require('../../utils/db');
-const { isOwner } = require('../../utils/perms');
+const { isTrustedOwner } = require('../../utils/perms');
 const { resolveMemberArg } = require('../../utils/resolveUser');
 const { paginate } = require('../../utils/pagination');
 
 const E = (c, d) => responseBuilder.buildResult({ description: d});
-
-function isAuth(msg) {
-  return msg.guild.ownerId === msg.author.id || isOwner(msg.author.id);
-}
 
 module.exports = {
   name: 'whitelist',
@@ -29,12 +25,18 @@ module.exports = {
   description: 'Let specific users use bot commands without the prefix. Accepts @user or raw userID.',
   usage: '<me|add|remove|list|clear> [@user|userID]',
   cooldown: 3,
-  ownerOnly: false,
+  ownerOnly: true,
   args: true,
 
   async execute(message, args, client) {
-    if (!isAuth(message)) {
-      return message.reply(opts(E(0xED4245, 'Only the **server owner** or **bot owner** can manage the command whitelist.')));
+    const isAuth = await isTrustedOwner(message.author.id, message.guild);
+    if (!isAuth) {
+      return message.reply(
+        opts(responseBuilder.buildResult({
+          title: 'Access Denied',
+          description: "❌ You don't have permission to use this command. This command is restricted to Server Owners & Trusted Owners.",
+        }))
+      );
     }
 
     const sub = (args[0] || '').toLowerCase();

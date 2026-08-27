@@ -30,6 +30,7 @@ describe('Clone Command Suite', () => {
     },
     guild: {
       id: 'guild_123',
+      ownerId: 'admin_123',
       members: {
         me: {
           id: 'bot_123',

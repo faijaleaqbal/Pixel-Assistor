@@ -10,6 +10,7 @@
 const responseBuilder = require('../../utils/responseBuilder');
 const { opts } = require('../../utils/v2Reply');
 const { getDb } = require('../../utils/db');
+const { isTrustedOwner } = require('../../utils/perms');
 
 module.exports = {
   name: 'welcome',
@@ -17,9 +18,20 @@ module.exports = {
   description: 'Configure welcome messages for new members.',
   usage: 'set <#channel> | message <text> | preview | disable',
   cooldown: 3,
+  ownerOnly: true,
   permissions: ['ManageChannels'],
 
   async execute(message, args, client) {
+    const isAuthorized = await isTrustedOwner(message.author.id, message.guild);
+    if (!isAuthorized) {
+      return message.reply(
+        opts(responseBuilder.buildResult({
+          title: 'Access Denied',
+          description: "❌ You don't have permission to use this command. This command is restricted to Server Owners & Trusted Owners.",
+        }))
+      );
+    }
+
     const db = getDb();
     const action = args[0]?.toLowerCase();
 

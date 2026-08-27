@@ -13,15 +13,11 @@
 const responseBuilder = require('../../utils/responseBuilder');
 const { opts } = require('../../utils/v2Reply');
 const { getDb } = require('../../utils/db');
-const { isOwner } = require('../../utils/perms');
+const { isTrustedOwner } = require('../../utils/perms');
 const { resolveUserArg } = require('../../utils/resolveUser');
 
 const E = (c, d) => responseBuilder.buildResult({ description: d});
 const RED = 0xED4245, GREEN = 0x57F287, BLUE = 0x5865F2, YELLOW = 0xFEE75C;
-
-function isAuth(msg) {
-  return msg.guild.ownerId === msg.author.id || isOwner(msg.author.id);
-}
 
 module.exports = {
   name: 'antinuke',
@@ -30,9 +26,18 @@ module.exports = {
   description: 'Configure anti-nuke protection for the server.',
   usage: '<enable|disable|setup|status|logging|punishment|owner|whitelist|wlrole> [args]',
   cooldown: 3,
+  ownerOnly: true,
 
   async execute(message, args, client) {
-    if (!isAuth(message)) return message.reply(opts(E(RED, 'Only the server owner or bot owner can use this command.')));
+    const isAuth = await isTrustedOwner(message.author.id, message.guild);
+    if (!isAuth) {
+      return message.reply(
+        opts(responseBuilder.buildResult({
+          title: 'Access Denied',
+          description: "❌ You don't have permission to use this command. This command is restricted to Server Owners & Trusted Owners.",
+        }))
+      );
+    }
 
     const db = getDb();
     const gid = message.guild.id;

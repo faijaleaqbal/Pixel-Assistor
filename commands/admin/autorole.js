@@ -16,7 +16,7 @@
 const responseBuilder = require('../../utils/responseBuilder');
 const { opts } = require('../../utils/v2Reply');
 const { getDb } = require('../../utils/db');
-const { canManageRole } = require('../../utils/perms');
+const { canManageRole, isTrustedOwner } = require('../../utils/perms');
 
 module.exports = {
   name: 'autorole',
@@ -25,9 +25,20 @@ module.exports = {
   description: 'Set or remove auto-roles for humans and bots on member join.',
   usage: 'set <@role> | remove | bots add/remove | humans add/remove | config | reset [all|bots|humans]',
   cooldown: 3,
+  ownerOnly: true,
   permissions: ['ManageRoles'],
 
   async execute(message, args, client) {
+    const isAuthorized = await isTrustedOwner(message.author.id, message.guild);
+    if (!isAuthorized) {
+      return message.reply(
+        opts(responseBuilder.buildResult({
+          title: 'Access Denied',
+          description: "❌ You don't have permission to use this command. This command is restricted to Server Owners & Trusted Owners.",
+        }))
+      );
+    }
+
     const db = getDb();
     const action = args[0]?.toLowerCase();
 

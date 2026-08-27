@@ -108,6 +108,7 @@ function makeSqlite() {
       adminRoles TEXT DEFAULT '[]',
       modRoles TEXT DEFAULT '[]',
       ownerRoles TEXT DEFAULT '[]',
+      extraOwners TEXT DEFAULT '[]',
       autoRoleBot TEXT,
       autoRoleHuman TEXT,
       modLimit INTEGER,
@@ -214,6 +215,7 @@ function makeSqlite() {
   try { db.exec('ALTER TABLE guild_config ADD COLUMN adminModLimit INTEGER'); } catch {}
   try { db.exec('ALTER TABLE guild_config ADD COLUMN modModLimit INTEGER'); } catch {}
   try { db.exec('ALTER TABLE guild_config ADD COLUMN prefix TEXT'); } catch {}
+  try { db.exec("ALTER TABLE guild_config ADD COLUMN extraOwners TEXT DEFAULT '[]'"); } catch {}
 
   // JSON helpers
   const j = (s, fallback = []) => {
@@ -389,6 +391,7 @@ function makeSqlite() {
           adminRoles: j(r.adminRoles),
           modRoles: j(r.modRoles),
           ownerRoles: j(r.ownerRoles),
+          extraOwners: j(r.extraOwners || r.ownerRoles || '[]'),
           autoRoleBot: r.autoRoleBot,
           autoRoleHuman: r.autoRoleHuman,
           modLimit: r.modLimit != null ? r.modLimit : null,
@@ -405,6 +408,7 @@ function makeSqlite() {
           leaveChannel: ex.leaveChannel, leaveMsg: ex.leaveMsg,
           badWords: j(ex.badWords), antiLink: ex.antiLink === 1, antiSpam: ex.antiSpam === 1,
           adminRoles: j(ex.adminRoles), modRoles: j(ex.modRoles), ownerRoles: j(ex.ownerRoles),
+          extraOwners: j(ex.extraOwners || ex.ownerRoles || '[]'),
           autoRoleBot: ex.autoRoleBot, autoRoleHuman: ex.autoRoleHuman,
           modLimit: ex.modLimit != null ? ex.modLimit : null,
           adminModLimit: ex.adminModLimit != null ? ex.adminModLimit : null,
@@ -412,17 +416,18 @@ function makeSqlite() {
           prefix: ex.prefix || null,
         } : {
           badWords: [], antiLink: false, antiSpam: false,
-          adminRoles: [], modRoles: [], ownerRoles: [],
+          adminRoles: [], modRoles: [], ownerRoles: [], extraOwners: [],
           modLimit: null, adminModLimit: null, modModLimit: null, prefix: null,
         };
         const m = { ...base, ...data, guildId };
-        db.prepare(`INSERT INTO guild_config (guildId,logChannel,autoRoleId,welcomeChannel,welcomeMsg,leaveChannel,leaveMsg,badWords,antiLink,antiSpam,adminRoles,modRoles,ownerRoles,autoRoleBot,autoRoleHuman,modLimit,adminModLimit,modModLimit,prefix)
-          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(guildId) DO UPDATE SET
+        db.prepare(`INSERT INTO guild_config (guildId,logChannel,autoRoleId,welcomeChannel,welcomeMsg,leaveChannel,leaveMsg,badWords,antiLink,antiSpam,adminRoles,modRoles,ownerRoles,extraOwners,autoRoleBot,autoRoleHuman,modLimit,adminModLimit,modModLimit,prefix)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(guildId) DO UPDATE SET
           logChannel=excluded.logChannel, autoRoleId=excluded.autoRoleId,
           welcomeChannel=excluded.welcomeChannel, welcomeMsg=excluded.welcomeMsg,
           leaveChannel=excluded.leaveChannel, leaveMsg=excluded.leaveMsg,
           badWords=excluded.badWords, antiLink=excluded.antiLink, antiSpam=excluded.antiSpam,
           adminRoles=excluded.adminRoles, modRoles=excluded.modRoles, ownerRoles=excluded.ownerRoles,
+          extraOwners=excluded.extraOwners,
           autoRoleBot=excluded.autoRoleBot, autoRoleHuman=excluded.autoRoleHuman,
           modLimit=excluded.modLimit, adminModLimit=excluded.adminModLimit, modModLimit=excluded.modModLimit,
           prefix=excluded.prefix`)
@@ -439,6 +444,7 @@ function makeSqlite() {
             JSON.stringify(m.adminRoles || []),
             JSON.stringify(m.modRoles || []),
             JSON.stringify(m.ownerRoles || []),
+            JSON.stringify(m.extraOwners || m.ownerRoles || []),
             m.autoRoleBot || null,
             m.autoRoleHuman || null,
             m.modLimit == null ? null : Number(m.modLimit),
@@ -623,6 +629,7 @@ function makeMongo() {
     adminRoles: [String],
     modRoles: [String],
     ownerRoles: [String],
+    extraOwners: [String],
     autoRoleBot: String,
     autoRoleHuman: String,
     modLimit: { type: Number, default: null },

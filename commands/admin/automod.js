@@ -11,6 +11,7 @@
 const responseBuilder = require('../../utils/responseBuilder');
 const { opts } = require('../../utils/v2Reply');
 const { getDb } = require('../../utils/db');
+const { isTrustedOwner } = require('../../utils/perms');
 
 module.exports = {
   name: 'automod',
@@ -19,11 +20,20 @@ module.exports = {
   description: 'Configure auto-moderation (bad words, anti-link, anti-spam).',
   usage: '<badwords|antilink|antispam> <sub-command>',
   cooldown: 3,
+  ownerOnly: true,
   permissions: ['Administrator'],
-  // args: true removed — let execute() handle the no-args case so `?automod`
-  // prints a helpful sub-command list instead of being rejected by the handler.
 
   async execute(message, args, client) {
+    const isAuthorized = await isTrustedOwner(message.author.id, message.guild);
+    if (!isAuthorized) {
+      return message.reply(
+        opts(responseBuilder.buildResult({
+          title: 'Access Denied',
+          description: "❌ You don't have permission to use this command. This command is restricted to Server Owners & Trusted Owners.",
+        }))
+      );
+    }
+
     const sub = args[0]?.toLowerCase();
     if (!sub) return message.reply(opts(responseBuilder.buildResult({ description: 'Provide a sub-command: `badwords`, `antilink`, or `antispam`.'})));
 

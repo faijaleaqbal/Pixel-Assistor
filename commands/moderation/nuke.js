@@ -2,7 +2,7 @@
 // Clone current channel with same settings, delete original.
 
 const responseBuilder = require('../../utils/responseBuilder');
-const { checkBotPermissions } = require('../../utils/perms');
+const { checkBotPermissions, isTrustedOwner } = require('../../utils/perms');
 const { opts } = require('../../utils/v2Reply');
 
 module.exports = {
@@ -12,8 +12,19 @@ module.exports = {
   description: 'Nuke the current channel (clone + delete original).',
   usage: '',
   cooldown: 5,
+  ownerOnly: true,
   permissions: ['ManageChannels'],
   async execute(message) {
+    const isAuthorized = await isTrustedOwner(message.author.id, message.guild);
+    if (!isAuthorized) {
+      return message.reply(
+        opts(responseBuilder.buildResult({
+          title: 'Access Denied',
+          description: "❌ You don't have permission to use this command. This command is restricted to Server Owners & Trusted Owners.",
+        }))
+      );
+    }
+
     const old = message.channel;
 
     // Check bot permissions

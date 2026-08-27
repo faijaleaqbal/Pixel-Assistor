@@ -12,6 +12,7 @@ const responseBuilder = require('../../utils/responseBuilder');
 const { opts } = require('../../utils/v2Reply');
 const discordTranscripts = require('discord-html-transcripts');
 const { getPrefix } = require('../../utils/prefixCache');
+const { isTrustedOwner } = require('../../utils/perms');
 const logger = require('../../utils/logger');
 
 module.exports = {
@@ -21,8 +22,19 @@ module.exports = {
   description: "Export this channel's transcript and DM it to you.",
   usage: '[count]',
   cooldown: 5,
+  ownerOnly: true,
   permissions: ['ManageMessages'],
   async execute(message, args, client) {
+    const isAuthorized = await isTrustedOwner(message.author.id, message.guild);
+    if (!isAuthorized) {
+      return message.reply(
+        opts(responseBuilder.buildResult({
+          title: 'Access Denied',
+          description: "❌ You don't have permission to use this command. This command is restricted to Server Owners & Trusted Owners.",
+        }))
+      );
+    }
+
     const prefix = await getPrefix(message.guild?.id);
 
     // ── 1. Parse optional message count ──

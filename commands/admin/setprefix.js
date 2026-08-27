@@ -4,7 +4,7 @@ const { opts } = require('../../utils/v2Reply');
 const config = require('../../utils/config');
 const { getDb } = require('../../utils/db');
 const { setPrefix } = require('../../utils/prefixCache');
-const { hasPermission, isOwner } = require('../../utils/perms');
+const { isTrustedOwner } = require('../../utils/perms');
 
 module.exports = {
   name: 'setprefix',
@@ -13,11 +13,18 @@ module.exports = {
   description: 'Change the bot prefix for this server.',
   usage: '<new-prefix|default|reset>',
   cooldown: 5,
+  ownerOnly: true,
   permissions: ['Administrator'],
   args: true,
   async execute(message, args, client) {
-    if (!hasPermission(message.member, 'Administrator') && !isOwner(message.author.id) && message.guild.ownerId !== message.author.id) {
-      return message.reply(opts(responseBuilder.buildResult({ description: 'You need the `Administrator` permission to change the server prefix.'})));
+    const isAuthorized = await isTrustedOwner(message.author.id, message.guild);
+    if (!isAuthorized) {
+      return message.reply(
+        opts(responseBuilder.buildResult({
+          title: 'Access Denied',
+          description: "❌ You don't have permission to use this command. This command is restricted to Server Owners & Trusted Owners.",
+        }))
+      );
     }
 
     const input = args[0];

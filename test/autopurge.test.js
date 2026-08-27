@@ -24,8 +24,12 @@ describe('Auto-Purge Command Suite', () => {
   const mockMessage = {
     channelId,
     channel: mockChannel,
+    author: {
+      id: 'admin_123',
+    },
     guild: {
       id: 'guild_123',
+      ownerId: 'admin_123',
       members: {
         me: { id: 'bot_123' },
       },

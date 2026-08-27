@@ -6,7 +6,7 @@
 const responseBuilder = require('../utils/responseBuilder');
 const logger = require('../utils/logger');
 const cooldowns = require('../utils/cooldowns');
-const { hasPermission, isOwner, checkBotPermissions } = require('../utils/perms');
+const { hasPermission, isOwner, isTrustedOwner, checkBotPermissions } = require('../utils/perms');
 const { AppError } = require('../utils/errors');
 const { safeReply } = require('../utils/interactionHelper');
 const { opts } = require('../utils/v2Reply');
@@ -21,8 +21,11 @@ async function executePrefixCommand(cmd, message, args, client, prefix) {
 
   try {
     // 1. Owner-only check
-    if (cmd.ownerOnly && !isOwner(userId)) {
-      return replyError(message, 'This command is restricted to the bot owner.', 'Access Denied', '🔒');
+    if (cmd.ownerOnly) {
+      const isAuthorized = await isTrustedOwner(userId, message.guild);
+      if (!isAuthorized) {
+        return replyError(message, "You don't have permission to use this command. This is an owner-only command.", 'Access Denied', '🔒', client);
+      }
     }
 
     // 2. Member permissions check
@@ -104,14 +107,17 @@ async function executeSlashCommand(cmd, interaction, client) {
 
   try {
     // 1. Owner-only check
-    if (cmd.ownerOnly && !isOwner(userId)) {
-      const embed = responseBuilder.buildError({
-        title: 'Access Denied',
-        emoji: '🔒',
-        error: 'This command is restricted to the bot owner.',
-        client,
-      });
-      return safeReply(interaction, opts(embed, { ephemeral: true }));
+    if (cmd.ownerOnly) {
+      const isAuthorized = await isTrustedOwner(userId, interaction.guild);
+      if (!isAuthorized) {
+        const embed = responseBuilder.buildError({
+          title: 'Access Denied',
+          emoji: '🔒',
+          error: "You don't have permission to use this command. This is an owner-only command.",
+          client,
+        });
+        return safeReply(interaction, opts(embed, { ephemeral: true }));
+      }
     }
 
     // 2. Member permissions check

@@ -32,17 +32,62 @@ function hasPermission(member, flagOrName) {
   return member.permissions?.has(flag) ?? false;
 }
 
-function isOwner(userId) {
+function isBotOwner(userId) {
   if (!userId) return false;
   if (config.ownerId && userId === config.ownerId) return true;
   if (Array.isArray(config.ownerIds) && config.ownerIds.includes(userId)) return true;
   return false;
 }
 
-function isGuildOwner(member, guild) {
-  const g = guild || member?.guild;
-  if (!g || !member) return false;
-  return g.ownerId === member.id;
+function isGuildOwner(memberOrId, guild) {
+  const userId = typeof memberOrId === 'string' ? memberOrId : memberOrId?.id;
+  const g = guild || memberOrId?.guild;
+  if (!g || !userId) return false;
+  return g.ownerId === userId;
+}
+
+function isOwner(userId, guild) {
+  if (!userId) return false;
+  if (isBotOwner(userId)) return true;
+  if (guild && isGuildOwner(userId, guild)) return true;
+  return false;
+}
+
+async function isTrustedOwner(userId, guild) {
+  if (!userId) return false;
+  // 1. Bot creator / global owner
+  if (isBotOwner(userId)) return true;
+  // 2. Guild owner
+  const g = guild;
+  if (g && isGuildOwner(userId, g)) return true;
+  // 3. Guild Extra / Trusted Owners from DB
+  if (g && g.id) {
+    try {
+      const { getDb } = require('./db');
+      const db = getDb();
+      const gCfg = await db.guildConfig.get(g.id);
+      const extra = gCfg?.extraOwners || gCfg?.ownerRoles || [];
+      if (Array.isArray(extra) && extra.includes(userId)) return true;
+    } catch {
+      // fallback
+    }
+  }
+  return false;
+}
+
+async function getTrustedOwners(guild) {
+  if (!guild || !guild.id) return { guildOwnerId: null, extraOwners: [] };
+  let extraOwners = [];
+  try {
+    const { getDb } = require('./db');
+    const db = getDb();
+    const gCfg = await db.guildConfig.get(guild.id);
+    extraOwners = gCfg?.extraOwners || gCfg?.ownerRoles || [];
+  } catch {}
+  return {
+    guildOwnerId: guild.ownerId,
+    extraOwners: Array.isArray(extraOwners) ? extraOwners : [],
+  };
 }
 
 function missingNames(member, flagNames = []) {
@@ -189,7 +234,10 @@ function canManageRole(actor, role, guild, options = {}) {
 module.exports = {
   hasPermission,
   isOwner,
+  isBotOwner,
   isGuildOwner,
+  isTrustedOwner,
+  getTrustedOwners,
   missingNames,
   checkBotPermissions,
   canManageMember,
