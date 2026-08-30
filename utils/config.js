@@ -59,7 +59,9 @@ module.exports = {
   deployManager: (process.env.DEPLOY_MANAGER || 'pm2').toLowerCase(),
 
   // Transcript viewer service (separate process in /transcript-viewer)
+  viewerPort: toInt(process.env.VIEWER_PORT, 3847),
   viewerBaseUrl: process.env.VIEWER_BASE_URL || '',
+  viewerInternalUrl: process.env.VIEWER_INTERNAL_URL || `http://127.0.0.1:${toInt(process.env.VIEWER_PORT, 3847)}`,
 
   ownerIds: (process.env.OWNER_IDS || '').split(',').filter(Boolean),
 };

@@ -3,6 +3,9 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
+// Load environment variables from .env in parent directory
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
+
 const app = express();
 const PORT = process.env.VIEWER_PORT || 3847;
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
@@ -35,8 +38,11 @@ app.post('/upload', (req, res) => {
             console.log(`[EXISTS] ${fileName} — serving cached`);
         }
 
-        // Return the view URL
-        const baseUrl = process.env.VIEWER_BASE_URL || `http://localhost:${PORT}`;
+        // Return the view URL (prefers VIEWER_BASE_URL, otherwise uses Host header)
+        const hostHeader = req.headers['x-forwarded-host'] || req.headers.host;
+        const protoHeader = req.headers['x-forwarded-proto'] || req.protocol;
+        const autoBaseUrl = hostHeader ? `${protoHeader}://${hostHeader}` : `http://localhost:${PORT}`;
+        const baseUrl = (process.env.VIEWER_BASE_URL || autoBaseUrl).replace(/\/+$/, '');
         const viewUrl = `${baseUrl}/${fileName}`;
 
         return res.json({ url: viewUrl, file: fileName });

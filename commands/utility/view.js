@@ -97,7 +97,8 @@ module.exports = {
     // ── 3. POST raw buffer to the viewer service ──
     let uploadResult;
     try {
-      const uploadUrl = `${config.viewerBaseUrl.replace(/\/+$/, '')}/upload`;
+      const targetBase = config.viewerInternalUrl || config.viewerBaseUrl;
+      const uploadUrl = `${targetBase.replace(/\/+$/, '')}/upload`;
       const res = await request(uploadUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/octet-stream' },
@@ -113,7 +114,10 @@ module.exports = {
     }
 
     // ── 4. Reply with the link ──
-    const viewerUrl = uploadResult.url;
+    let viewerUrl = uploadResult.url;
+    if (!viewerUrl && uploadResult.file) {
+      viewerUrl = `${config.viewerBaseUrl.replace(/\/+$/, '')}/${uploadResult.file}`;
+    }
     if (!viewerUrl) {
       return message.reply(opts(responseBuilder.buildResult({ description: 'Viewer service returned an unexpected response (no URL).'})));
     }
